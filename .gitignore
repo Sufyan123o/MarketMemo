@@ -38,6 +38,7 @@ pnpm-debug.log*
 venv/
 .venv/
 env/
+".env"
 # Compiled files
 __pycache__/
 *.py[cod]
