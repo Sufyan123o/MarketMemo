@@ -1,0 +1,71 @@
+##############################################################################
+# Full‑stack React + Flask .gitignore
+# (British‑English comments, one file to rule them all)
+##############################################################################
+
+# ─────────────────── 1. OS & editor cruft ───────────────────────────────────
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Icon?
+.idea/                 # JetBrains
+.vscode/               # VS Code
+*.sublime-*            # Sublime
+*.code-workspace
+
+# ─────────────────── 2. Environment variables & secrets ─────────────────────
+.env
+.env.*                 # .env.local, .env.production, etc.
+
+# ─────────────────── 3. Node / React (front‑end) ────────────────────────────
+node_modules/
+# Build & cache
+build/                 # CRA / Vite output – comment out if you commit it
+dist/
+.cache/
+.parcel-cache/
+.eslintcache
+.npm/
+coverage/
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ─────────────────── 4. Python / Flask (back‑end) ───────────────────────────
+# Virtual environments
+venv/
+.venv/
+env/
+# Compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+# Packaging
+*.egg-info/
+.eggs/
+build/                 # Python build artefacts
+dist/
+# Testing & tooling
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.pytype/
+# Flask runtime bits
+instance/              # per‑machine configs, uploads, etc.
+*.sqlite3
+*.db
+
+# ─────────────────── 5. Misc tooling ────────────────────────────────────────
+.poetry/               # Poetry virtual‑env in project
+Pipfile.lock           # Pipenv lock (if you don’t commit it)
+
+# ─────────────────── 6. Optional lock files ────────────────────────────────
+# Uncomment if you *don’t* want to commit them
+# yarn.lock
+# package-lock.json
+# pnpm-lock.yaml
+##############################################################################
