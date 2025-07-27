@@ -12,7 +12,7 @@ Icon?
 .vscode/               # VS Code
 *.sublime-*            # Sublime
 *.code-workspace
-
+*.md
 # ─────────────────── 2. Environment variables & secrets ─────────────────────
 .env
 .env.*                 # .env.local, .env.production, etc.
@@ -70,3 +70,4 @@ Pipfile.lock           # Pipenv lock (if you don’t commit it)
 # package-lock.json
 # pnpm-lock.yaml
 ##############################################################################
+README.md

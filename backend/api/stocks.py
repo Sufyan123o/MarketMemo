@@ -64,7 +64,7 @@ async def get_news_sentiment(ticker: str):
 async def get_ai_analysis(request: StockAnalysisRequest):
     """Get AI analysis for a single stock."""
     news = await stock_service.get_financial_news(request.ticker)
-    analysis = await ai_service.get_ai_summary(news, request.ticker, request.investor_level)
+    analysis = ai_service.generate_ai_summary(news, request.ticker, request.investor_level)
     sentiment = ai_service.analyze_sentiment(news)
     
     return {
@@ -80,13 +80,28 @@ async def get_ai_comparison(request: ComparisonRequest):
     news1 = await stock_service.get_financial_news(request.ticker1)
     news2 = await stock_service.get_financial_news(request.ticker2)
     
-    comparison = await ai_service.get_ai_comparison(
-        request.ticker1, 
-        request.ticker2, 
-        news1, 
-        news2, 
-        request.investor_level
-    )
+    # Get stock data for both tickers
+    stock1_info = await stock_service.get_stock_info(request.ticker1)
+    stock2_info = await stock_service.get_stock_info(request.ticker2)
+    
+    # Prepare data for comparison
+    stock1_data = {
+        'ticker': request.ticker1,
+        'current_price': stock1_info.get('currentPrice'),
+        'market_cap': stock1_info.get('marketCap'),
+        'pe_ratio': stock1_info.get('trailingPE'),
+        'sentiment': ai_service.analyze_sentiment(news1)
+    }
+    
+    stock2_data = {
+        'ticker': request.ticker2,
+        'current_price': stock2_info.get('currentPrice'),
+        'market_cap': stock2_info.get('marketCap'),
+        'pe_ratio': stock2_info.get('trailingPE'),
+        'sentiment': ai_service.analyze_sentiment(news2)
+    }
+    
+    comparison = ai_service.compare_stocks(stock1_data, stock2_data)
     
     return {
         "ticker1": request.ticker1,

@@ -1,4 +1,4 @@
-# QuantView AI - React Version
+# AITradingPlatform
 
 A modern React frontend with FastAPI backend recreation of the AI stock analysis platform. This version maintains all the core functionality of the original Streamlit app while providing a more responsive and interactive user experience.
 

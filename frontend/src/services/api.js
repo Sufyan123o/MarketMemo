@@ -36,10 +36,10 @@ export const stockAPI = {
   
   // AI analysis
   getAIAnalysis: (ticker, investorLevel = 'Beginner') =>
-    api.post('/api/ai/analysis', { ticker, investor_level: investorLevel }),
+    api.post('/api/stocks/ai/analysis', { ticker, investor_level: investorLevel }),
   
   getAIComparison: (ticker1, ticker2, investorLevel = 'Beginner') =>
-    api.post('/api/ai/comparison', { 
+    api.post('/api/stocks/ai/comparison', { 
       ticker1, 
       ticker2, 
       investor_level: investorLevel 
