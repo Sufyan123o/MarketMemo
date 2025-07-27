@@ -21,7 +21,18 @@ const StockMetrics = ({ ticker, data, analysis }) => {
 
   const currentPrice = data.current_price || data.close_prices?.[data.close_prices.length - 1];
   const changePercent = data.change_percent || 0;
-  const sentiment = analysis?.sentiment || 0;
+  
+  // Safely extract sentiment value with multiple fallback checks
+  let sentiment = 0;
+  if (analysis?.sentiment !== undefined && analysis?.sentiment !== null) {
+    if (typeof analysis.sentiment === 'number') {
+      sentiment = analysis.sentiment;
+    } else if (typeof analysis.sentiment === 'object' && analysis.sentiment.sentiment !== undefined) {
+      sentiment = Number(analysis.sentiment.sentiment) || 0;
+    } else {
+      sentiment = Number(analysis.sentiment) || 0;
+    }
+  }
 
   const formatNumber = (num) => {
     if (num >= 1e9) return `$${(num / 1e9).toFixed(2)}B`;
@@ -114,7 +125,7 @@ const StockMetrics = ({ ticker, data, analysis }) => {
               News Sentiment
             </Typography>
             <Chip
-              label={`${sentiment >= 0 ? 'Positive' : 'Negative'} (${sentiment.toFixed(2)})`}
+              label={`${sentiment >= 0 ? 'Positive' : 'Negative'} (${Number(sentiment).toFixed(2)})`}
               color={sentiment >= 0 ? 'success' : 'error'}
               size="small"
             />

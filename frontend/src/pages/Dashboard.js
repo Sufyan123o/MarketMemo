@@ -71,7 +71,7 @@ const Dashboard = () => {
         newStockData[result.ticker] = result.data;
         newAnalysisData[result.ticker] = {
           news: result.news,
-          sentiment: result.sentiment,
+          sentiment: result.sentiment.sentiment, // Extract sentiment value from the response object
         };
       });
 
