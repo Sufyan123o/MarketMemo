@@ -115,6 +115,8 @@ async def get_ai_comparison(request: ComparisonRequest):
 async def get_price_prediction(ticker: str):
     """Get price prediction for a stock (placeholder)."""
     # This would integrate with the Prophet model from the original backend
+    #a prophet model is not implemented yet
+    # This is a placeholder response
     return {
         "ticker": ticker,
         "prediction": "Price prediction feature coming soon",

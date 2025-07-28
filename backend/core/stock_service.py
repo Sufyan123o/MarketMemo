@@ -15,14 +15,15 @@ class StockDataService:
             print("Warning: NEWS_API_KEY not found in environment variables")
 
     async def get_stock_data(self, ticker: str, start_date: str, end_date: str) -> Optional[Dict[str, Any]]:
-        """Fetches historical stock data from yFinance."""
+        """Fetches historical stock data from yFinance"""
+        ## Used for the charts and analysis, all time-series data
         try:
             stock = yf.Ticker(ticker)
             info = stock.info
             
             if not info or info.get('regularMarketPrice') is None:
                 return None
-                
+            
             hist_data = stock.history(start=start_date, end=end_date)
             if hist_data.empty:
                 return None
@@ -49,21 +50,22 @@ class StockDataService:
             }
             
             # Calculate change percentage
-            if len(data['close_prices']) >= 2:
+            if len(data['close_prices']) >= 2: # Ensure there are at least 2 prices to calculate change
                 current = data['close_prices'][-1]
                 previous = data['close_prices'][-2]
-                data['change_percent'] = ((current - previous) / previous) * 100
+                data['change_percent'] = ((current - previous) / previous) * 100 #
             else:
                 data['change_percent'] = 0
                 
             return data
-            
         except Exception as e:
             print(f"Error fetching data for {ticker}: {e}")
             return None
 
     async def get_stock_info(self, ticker: str) -> Optional[Dict[str, Any]]:
         """Get basic stock information."""
+        ## Returns the current company info, current price, market cap, PE ratio, etc.
+        #used in the watchlist, portfolio, stock cards
         try:
             stock = yf.Ticker(ticker)
             info = stock.info

@@ -1,4 +1,4 @@
-# Start Script for QuantView AI React Version
+# Start Script for SufsTrading AI React Version
 
 # Start Backend (Run this in first terminal)
 Write-Host "Starting FastAPI Backend..." -ForegroundColor Green

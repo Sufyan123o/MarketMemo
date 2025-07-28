@@ -117,7 +117,7 @@ const Dashboard = () => {
           fontWeight: 700,
         }}
       >
-        QuantView AI
+        SufsTrading AI
       </Typography>
       <Typography variant="subtitle1" sx={{ mb: 4, color: 'rgba(255, 255, 255, 0.7)' }}>
         Welcome, {user?.email}!

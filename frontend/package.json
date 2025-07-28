@@ -1,7 +1,7 @@
 {
-  "name": "quantview-ai-frontend",
+  "name": "sufstrading-ai-frontend",
   "version": "1.0.0",
-  "description": "React frontend for QuantView AI stock analysis platform",
+  "description": "React frontend for SufsTrading AI stock analysis platform",
   "private": true,
   "dependencies": {
     "@testing-library/jest-dom": "^5.16.4",

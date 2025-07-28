@@ -17,8 +17,8 @@ from api.playground import router as playground_router
 
 # Create FastAPI app
 app = FastAPI(
-    title="QuantView AI API",
-    description="Backend API for QuantView AI stock analysis platform",
+    title="SufsTrading AI API",
+    description="Backend API for SufsTrading AI stock analysis platform",
     version="1.0.0"
 )
 
@@ -40,11 +40,11 @@ app.include_router(playground_router, prefix="/api/playground", tags=["playgroun
 
 @app.get("/")
 async def root():
-    return {"message": "QuantView AI API is running!"}
+    return {"message": "SufsTrading AI API is running!"}
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "message": "QuantView AI API is operational"}
+    return {"status": "healthy", "message": "SufsTrading AI API is operational"}
 
 if __name__ == "__main__":
     uvicorn.run(

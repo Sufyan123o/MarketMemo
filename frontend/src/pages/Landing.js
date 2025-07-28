@@ -118,7 +118,7 @@ const Landing = () => {
               lineHeight: 1.6,
             }}
           >
-            QuantView AI combines real-time data, news sentiment, and advanced AI to give you 
+            SufsTrading AI combines real-time data, news sentiment, and advanced AI to give you 
             a complete picture of the stocks you care about. Move beyond the noise and make 
             data-driven decisions.
           </Typography>

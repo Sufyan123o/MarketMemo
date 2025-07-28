@@ -104,7 +104,7 @@ const Login = () => {
               fontWeight: 700,
             }}
           >
-            🔐 QuantView AI
+            🔐 SufsTrading AI
           </Typography>
 
           <Tabs

@@ -71,7 +71,7 @@ const Navbar = () => {
           }}
           onClick={() => navigate('/')}
         >
-          💡 QuantView AI
+          💡 SufsTrading AI
         </Typography>
 
         {user && (

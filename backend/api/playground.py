@@ -61,6 +61,8 @@ async def execute_trade(
     else:
         raise HTTPException(status_code=400, detail="Invalid action. Use 'buy' or 'sell'")
 
+
+#!This can be improved
 @router.get("/health-report")
 async def get_health_report(current_user: dict = Depends(get_current_user)):
     """Get portfolio health report."""
