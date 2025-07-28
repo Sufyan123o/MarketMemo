@@ -39,7 +39,7 @@ class AIAnalysisService:
         return sum(sentiment_scores) / len(sentiment_scores)
 
     def generate_ai_summary(self, articles: List[Dict[str, Any]], ticker: str, investor_level: str = "Beginner") -> str:
-        """Generate AI summary of news articles (simplified version)."""
+        """Generate AI summary of news articles with different complexity levels."""
         if not articles:
             return "No news articles available for analysis."
         
@@ -49,33 +49,155 @@ class AIAnalysisService:
         # Count of articles
         article_count = len([a for a in articles if a and a.get('title')])
         
-        # Create basic summary based on sentiment
-        if sentiment_score > 0.1:
-            sentiment_text = "positive"
-            recommendation = "The recent news appears generally favorable"
-        elif sentiment_score < -0.1:
-            sentiment_text = "negative" 
-            recommendation = "The recent news shows some concerning signals"
+        # Generate different analysis based on investor level
+        if investor_level.lower() == "advanced":
+            return self._generate_advanced_analysis(articles, ticker, sentiment_score, article_count)
         else:
-            sentiment_text = "neutral"
-            recommendation = "The recent news shows mixed signals"
-            
+            return self._generate_beginner_analysis(articles, ticker, sentiment_score, article_count)
+    
+    def _generate_beginner_analysis(self, articles: List[Dict[str, Any]], ticker: str, sentiment_score: float, article_count: int) -> str:
+        """Generate beginner-friendly analysis with simple explanations."""
+        # Determine sentiment and recommendation in simple terms
+        if sentiment_score > 0.3:
+            sentiment_text = "VERY POSITIVE 📈"
+            recommendation = "The news looks really good! This could be a good time to consider buying."
+            emoji = "🟢"
+        elif sentiment_score > 0.1:
+            sentiment_text = "POSITIVE 📊"
+            recommendation = "The news is generally favorable. Good for current holders."
+            emoji = "🟢"
+        elif sentiment_score > -0.1:
+            sentiment_text = "NEUTRAL ⚖️"
+            recommendation = "Mixed signals in the news. Wait and see approach recommended."
+            emoji = "🟡"
+        elif sentiment_score > -0.3:
+            sentiment_text = "NEGATIVE 📉"
+            recommendation = "Some concerning news. Consider waiting before buying."
+            emoji = "🟠"
+        else:
+            sentiment_text = "VERY NEGATIVE ⚠️"
+            recommendation = "Significant negative news. Be cautious with this stock."
+            emoji = "🔴"
+        
         summary = f"""
-Analysis for {ticker}:
+{emoji} SIMPLE ANALYSIS FOR {ticker}
 
+📊 WHAT'S HAPPENING:
 • Analyzed {article_count} recent news articles
-• Overall sentiment: {sentiment_text} (score: {sentiment_score:.2f})
-• {recommendation}
+• Overall news sentiment: {sentiment_text}
+• Sentiment Score: {sentiment_score:.2f} (Range: -1.0 to +1.0)
 
-Key headlines analyzed:
+💡 WHAT THIS MEANS FOR YOU:
+{recommendation}
+
+📰 KEY HEADLINES:
 """
         
-        # Add top 3 headlines
+        # Add top 3 headlines with simple explanations
         for i, article in enumerate(articles[:3]):
             if article and article.get('title'):
                 summary += f"• {article['title']}\n"
         
-        summary += f"\nNote: This analysis is based on sentiment scoring of recent news. Please conduct thorough research before making investment decisions."
+        summary += f"""
+🎓 BEGINNER TIPS:
+• Positive sentiment (above 0.1) usually means good news for the stock
+• Negative sentiment (below -0.1) might mean challenges ahead
+• Always do more research before making investment decisions
+• Never invest more than you can afford to lose
+
+⚠️ IMPORTANT: This is news analysis only. Consider company fundamentals, market conditions, and your financial goals before investing.
+"""
+        
+        return summary
+    
+    def _generate_advanced_analysis(self, articles: List[Dict[str, Any]], ticker: str, sentiment_score: float, article_count: int) -> str:
+        """Generate comprehensive analysis for advanced investors."""
+        # Advanced sentiment classification
+        if sentiment_score > 0.5:
+            sentiment_category = "STRONG BULLISH"
+            risk_level = "LOW"
+        elif sentiment_score > 0.2:
+            sentiment_category = "BULLISH"
+            risk_level = "LOW-MODERATE"
+        elif sentiment_score > -0.2:
+            sentiment_category = "NEUTRAL"
+            risk_level = "MODERATE"
+        elif sentiment_score > -0.5:
+            sentiment_category = "BEARISH"
+            risk_level = "MODERATE-HIGH"
+        else:
+            sentiment_category = "STRONG BEARISH"
+            risk_level = "HIGH"
+        
+        # Calculate additional metrics
+        news_velocity = "HIGH" if article_count > 15 else "MODERATE" if article_count > 8 else "LOW"
+        
+        summary = f"""
+📈 ADVANCED ANALYSIS: {ticker}
+
+🎯 SENTIMENT METRICS:
+• News Sentiment Score: {sentiment_score:.3f}
+• Sentiment Category: {sentiment_category}
+• News Velocity: {news_velocity} ({article_count} articles analyzed)
+• Risk Level: {risk_level}
+
+📊 TECHNICAL INDICATORS:
+• Sentiment Momentum: {'POSITIVE' if sentiment_score > 0 else 'NEGATIVE'}
+• News Volume: {article_count} articles (vs. avg 10-12 for major stocks)
+• Sentiment Volatility: {'HIGH' if abs(sentiment_score) > 0.4 else 'MODERATE' if abs(sentiment_score) > 0.2 else 'LOW'}
+
+⚠️ RISK ASSESSMENT:
+• News-driven Risk: {risk_level}
+• Potential Catalysts: {'POSITIVE' if sentiment_score > 0.1 else 'NEGATIVE' if sentiment_score < -0.1 else 'NEUTRAL'}
+• Market Sensitivity: {'HIGH' if abs(sentiment_score) > 0.3 else 'MODERATE'}
+
+📰 NEWS ANALYSIS BREAKDOWN:
+"""
+        
+        # Add detailed news analysis
+        positive_count = 0
+        negative_count = 0
+        neutral_count = 0
+        
+        for article in articles:
+            if article and article.get('title'):
+                article_sentiment = self.analyzer.polarity_scores(
+                    (article.get('title', '') + ' ' + (article.get('description') or '')).strip()
+                )['compound']
+                
+                if article_sentiment > 0.1:
+                    positive_count += 1
+                elif article_sentiment < -0.1:
+                    negative_count += 1
+                else:
+                    neutral_count += 1
+        
+        summary += f"""
+• Positive Articles: {positive_count}/{article_count} ({positive_count/article_count*100:.1f}%)
+• Negative Articles: {negative_count}/{article_count} ({negative_count/article_count*100:.1f}%)
+• Neutral Articles: {neutral_count}/{article_count} ({neutral_count/article_count*100:.1f}%)
+
+📈 TOP IMPACT HEADLINES:
+"""
+        
+        # Add top 5 headlines with sentiment scores
+        for i, article in enumerate(articles[:5]):
+            if article and article.get('title'):
+                article_sentiment = self.analyzer.polarity_scores(
+                    (article.get('title', '') + ' ' + (article.get('description') or '')).strip()
+                )['compound']
+                
+                impact = "🔴 NEGATIVE" if article_sentiment < -0.1 else "🟢 POSITIVE" if article_sentiment > 0.1 else "🟡 NEUTRAL"
+                summary += f"• [{impact}] {article['title']} (Score: {article_sentiment:.2f})\n"
+        
+        summary += f"""
+🎯 TRADING IMPLICATIONS:
+• Short-term Bias: {'BULLISH' if sentiment_score > 0.1 else 'BEARISH' if sentiment_score < -0.1 else 'NEUTRAL'}
+• News-driven Volatility: {'EXPECTED' if abs(sentiment_score) > 0.3 else 'POSSIBLE' if abs(sentiment_score) > 0.1 else 'LOW'}
+• Institutional Sentiment: {'LIKELY POSITIVE' if sentiment_score > 0.2 else 'LIKELY NEGATIVE' if sentiment_score < -0.2 else 'MIXED'}
+
+⚠️ DISCLAIMER: This analysis is based on news sentiment only. Combine with technical analysis, fundamental analysis, and market conditions for comprehensive investment decisions.
+"""
         
         return summary
 
