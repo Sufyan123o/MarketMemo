@@ -8,8 +8,10 @@ import {
   Button,
   Box,
   Chip,
+  Tooltip,
+  IconButton,
 } from '@mui/material';
-import { Star, Delete } from '@mui/icons-material';
+import { Star, Delete, Info } from '@mui/icons-material';
 import { watchlistAPI, stockAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -143,11 +145,62 @@ const Watchlist = () => {
                             ${data.current_price?.toFixed(2) || 'N/A'}
                           </Typography>
                           
-                          <Chip
-                            label={`${data.change_percent >= 0 ? '+' : ''}${data.change_percent?.toFixed(2) || 0}%`}
-                            color={data.change_percent >= 0 ? 'success' : 'error'}
-                            size="small"
-                          />
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                            <Chip
+                              label={`${data.change_percent >= 0 ? '+' : ''}${data.change_percent?.toFixed(2) || 0}%`}
+                              color={data.change_percent >= 0 ? 'success' : 'error'}
+                              size="small"
+                            />
+                            <Tooltip
+                              title={
+                                <Box sx={{ p: 1 }}>
+                                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
+                                    Daily Price Change
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
+                                    Shows the percentage change from the previous trading day's closing price.
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
+                                    • Calculated as: (Current Price - Previous Close) / Previous Close × 100
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
+                                    • Time Range: 1 trading day (24 hours during market hours)
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ display: 'block' }}>
+                                    • Updates in real-time during market hours
+                                  </Typography>
+                                </Box>
+                              }
+                              arrow
+                              placement="top"
+                              componentsProps={{
+                                tooltip: {
+                                  sx: {
+                                    bgcolor: 'rgba(26, 32, 44, 0.95)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    backdropFilter: 'blur(10px)',
+                                    maxWidth: 320,
+                                  },
+                                },
+                                arrow: {
+                                  sx: {
+                                    color: 'rgba(26, 32, 44, 0.95)',
+                                  },
+                                },
+                              }}
+                            >
+                              <IconButton
+                                size="small"
+                                sx={{ 
+                                  color: 'rgba(255, 255, 255, 0.5)',
+                                  '&:hover': { color: '#36D1DC' },
+                                  p: 0.3
+                                }}
+                              >
+                                <Info fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
 
                           <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)', mt: 1 }}>
                             Market Cap: ${data.market_cap ? `${(data.market_cap / 1e9).toFixed(2)}B` : 'N/A'}
