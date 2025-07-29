@@ -36,7 +36,16 @@ async def get_stock_data(
     """Get historical stock data for a ticker."""
     data = await stock_service.get_stock_data(ticker.upper(), start_date, end_date)
     if not data:
-        raise HTTPException(status_code=404, detail=f"Stock data not found for {ticker}")
+        # Return empty structure instead of 404 to prevent frontend crashes
+        return {
+            "ticker": ticker,
+            "error": "Data temporarily unavailable",
+            "dates": [],
+            "close_prices": [],
+            "volumes": [],
+            "current_price": 0,
+            "change_percent": 0
+        }
     return data
 
 @router.get("/info/{ticker}")
@@ -44,7 +53,15 @@ async def get_stock_info(ticker: str):
     """Get basic stock information."""
     data = await stock_service.get_stock_info(ticker.upper())
     if not data:
-        raise HTTPException(status_code=404, detail=f"Stock info not found for {ticker}")
+        # Return empty structure instead of 404 to prevent frontend crashes
+        return {
+            "ticker": ticker,
+            "error": "Info temporarily unavailable",
+            "current_price": 0,
+            "market_cap": "N/A",
+            "pe_ratio": "N/A",
+            "change_percent": 0
+        }
     return data
 
 @router.get("/news/{ticker}")
