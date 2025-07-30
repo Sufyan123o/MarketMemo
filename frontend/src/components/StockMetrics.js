@@ -42,6 +42,7 @@ const StockMetrics = ({ ticker, data, analysis }) => {
     if (ticker) {
       checkWatchlistStatus();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticker]);
 
   const checkWatchlistStatus = async () => {
@@ -110,9 +111,11 @@ const StockMetrics = ({ ticker, data, analysis }) => {
   }
 
   const formatNumber = (num) => {
-    if (num >= 1e9) return `$${(num / 1e9).toFixed(2)}B`;
-    if (num >= 1e6) return `$${(num / 1e6).toFixed(2)}M`;
-    return `$${num?.toFixed(2) || 'N/A'}`;
+    if (!num || num <= 0) return 'N/A';
+    // Finnhub returns market cap in millions already
+    if (num >= 1000000) return `$${(num / 1000000).toFixed(2)}T`;
+    if (num >= 1000) return `$${(num / 1000).toFixed(2)}B`;
+    return `$${num.toFixed(2)}M`;
   };
 
   return (
@@ -123,9 +126,29 @@ const StockMetrics = ({ ticker, data, analysis }) => {
     }}>
       <CardContent>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h5" sx={{ color: 'white', fontWeight: 600 }}>
-            {data.company_name || ticker}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {data.logo && (
+              <Box
+                component="img"
+                src={data.logo}
+                alt={`${data.company_name || ticker} logo`}
+                sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 1,
+                  objectFit: 'contain',
+                  bgcolor: 'white',
+                  p: 0.5,
+                }}
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+            )}
+            <Typography variant="h5" sx={{ color: 'white', fontWeight: 600 }}>
+              {data.company_name || ticker}
+            </Typography>
+          </Box>
           <Box>
             <Button
               size="small"
@@ -396,45 +419,65 @@ const StockMetrics = ({ ticker, data, analysis }) => {
                     backgroundColor: 'rgba(255, 255, 255, 0.05)',
                   },
                   cursor: 'pointer',
+                  py: 2,
                 }}
                 onClick={() => window.open(article.url, '_blank')}
               >
-                <ListItemText
-                  primary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography 
-                        variant="subtitle1" 
-                        sx={{ 
-                          color: 'white', 
-                          fontWeight: 500,
-                          flex: 1
-                        }}
-                      >
-                        {article.title}
-                      </Typography>
-                      <OpenInNew sx={{ color: '#36D1DC', fontSize: 16 }} />
-                    </Box>
-                  }
-                  secondary={
-                    <Box sx={{ mt: 1 }}>
-                      <Typography 
-                        variant="body2" 
-                        sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 0.5 }}
-                      >
-                        {article.description}
-                      </Typography>
-                      <Typography 
-                        variant="caption" 
-                        sx={{ 
-                          color: '#36D1DC',
-                          fontWeight: 500
-                        }}
-                      >
-                        Source: {article.source?.name || 'Unknown'}
-                      </Typography>
-                    </Box>
-                  }
-                />
+                <Box sx={{ display: 'flex', width: '100%', gap: 2 }}>
+                  {article.urlToImage && (
+                    <Box
+                      component="img"
+                      src={article.urlToImage}
+                      alt={article.title}
+                      sx={{
+                        width: 120,
+                        height: 80,
+                        objectFit: 'cover',
+                        borderRadius: 1,
+                        flexShrink: 0,
+                      }}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  )}
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography 
+                          variant="subtitle1" 
+                          sx={{ 
+                            color: 'white', 
+                            fontWeight: 500,
+                            flex: 1
+                          }}
+                        >
+                          {article.title}
+                        </Typography>
+                        <OpenInNew sx={{ color: '#36D1DC', fontSize: 16 }} />
+                      </Box>
+                    }
+                    secondary={
+                      <Box sx={{ mt: 1 }}>
+                        <Typography 
+                          variant="body2" 
+                          sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 0.5 }}
+                        >
+                          {article.description}
+                        </Typography>
+                        <Typography 
+                          variant="caption" 
+                          sx={{ 
+                            color: '#36D1DC',
+                            fontWeight: 500
+                          }}
+                        >
+                          Source: {article.source?.name || 'Unknown'}
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                </Box>
               </ListItem>
             ))}
           </List>
