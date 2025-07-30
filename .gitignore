@@ -17,7 +17,7 @@ node_modules/
 # Build & cache
 build/                 # CRA / Vite output – comment out if you commit it
 dist/
-.cache/
+cache/
 .parcel-cache/
 .eslintcache
 .npm/
