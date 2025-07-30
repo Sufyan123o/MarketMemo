@@ -168,9 +168,13 @@ const StockMetrics = ({ ticker, data, analysis }) => {
             <Button
               size="small"
               startIcon={<Add />}
+              onClick={() => {
+                // Open portfolio with pre-filled ticker
+                window.dispatchEvent(new CustomEvent('openPortfolioTrade', { detail: { ticker } }));
+              }}
               sx={{ color: '#5B86E5' }}
             >
-              Portfolio
+              Trade
             </Button>
           </Box>
         </Box>

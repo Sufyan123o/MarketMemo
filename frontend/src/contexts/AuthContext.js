@@ -37,9 +37,9 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const response = await authAPI.login(email, password);
-      const { token, user: userData } = response.data;
+      const { access_token, user: userData } = response.data;
       
-      localStorage.setItem('token', token);
+      localStorage.setItem('token', access_token);
       setUser(userData);
       toast.success('Login successful!');
       return { success: true };
@@ -53,9 +53,9 @@ export const AuthProvider = ({ children }) => {
   const register = async (email, password) => {
     try {
       const response = await authAPI.register(email, password);
-      const { token, user: userData } = response.data;
+      const { access_token, user: userData } = response.data;
       
-      localStorage.setItem('token', token);
+      localStorage.setItem('token', access_token);
       setUser(userData);
       toast.success('Registration successful!');
       return { success: true };

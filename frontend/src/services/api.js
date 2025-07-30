@@ -81,21 +81,19 @@ export const portfolioAPI = {
   getPortfolio: () =>
     api.get('/api/portfolio'),
   
-  addToPortfolio: (ticker, shares, purchasePrice) =>
-    api.post('/api/portfolio', {
+  executeTrade: (ticker, action, quantity, price) =>
+    api.post('/api/portfolio/trade', {
       ticker,
-      shares,
-      purchase_price: purchasePrice
+      action,
+      quantity,
+      price
     }),
   
-  removeFromPortfolio: (holdingId) =>
-    api.delete(`/api/portfolio/${holdingId}`),
+  getTradeHistory: () =>
+    api.get('/api/portfolio/trades'),
   
-  updatePortfolio: (holdingId, shares, purchasePrice) =>
-    api.put(`/api/portfolio/${holdingId}`, {
-      shares,
-      purchase_price: purchasePrice
-    }),
+  resetPortfolio: () =>
+    api.delete('/api/portfolio/reset'),
 };
 
 export const watchlistAPI = {

@@ -2,9 +2,10 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from typing import Optional
-import jwt
+from jose import jwt, JWTError
 from datetime import datetime, timedelta
 import os
+import json
 from passlib.context import CryptContext
 
 router = APIRouter()
@@ -14,10 +15,31 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # JWT settings
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 480  # 8 hours for testing
 
-# Mock user database (in a real app, use a proper database)
-fake_users_db = {}
+# Persistent user database
+USERS_FILE = "users.json"
+
+def load_users():
+    """Load users from file"""
+    try:
+        if os.path.exists(USERS_FILE):
+            with open(USERS_FILE, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Error loading users: {e}")
+    return {}
+
+def save_users(users_db):
+    """Save users to file"""
+    try:
+        with open(USERS_FILE, 'w') as f:
+            json.dump(users_db, f, indent=2)
+    except Exception as e:
+        print(f"Error saving users: {e}")
+
+# Load existing users or create empty database
+fake_users_db = load_users()
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -50,8 +72,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     try:
+        print(f"Received token: {credentials.credentials[:20]}...")  # Debug line
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
+        print(f"Decoded email: {email}")  # Debug line
         if email is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -60,12 +84,16 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
             )
         user = fake_users_db.get(email)
         if user is None:
+            print(f"User not found for email: {email}")  # Debug line
+            print(f"Available users: {list(fake_users_db.keys())}")  # Debug line
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User not found"
             )
+        print(f"User found: {user['email']}")  # Debug line
         return user
-    except jwt.PyJWTError:
+    except JWTError as e:
+        print(f"JWT Error: {str(e)}")  # Debug line
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -88,6 +116,7 @@ async def register(user: UserCreate):
         "uid": f"user_{len(fake_users_db) + 1}"
     }
     fake_users_db[user.email] = user_data
+    save_users(fake_users_db)  # Save to file
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
