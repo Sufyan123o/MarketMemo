@@ -15,7 +15,7 @@ class StockDataService:
         self.alpha_vantage_api_key = os.getenv("ALPHA_VANTAGE_API_KEY")
         self.base_url = "https://www.alphavantage.co/query"
         self.last_request_time = 0
-        self.min_request_interval = 12  # Alpha Vantage free tier: 5 requests per minute
+        self.min_request_interval = 1  # 1 second between requests to be respectful
         
         if not self.news_api_key:
             print("Warning: NEWS_API_KEY not found in environment variables")
@@ -24,7 +24,7 @@ class StockDataService:
             print("Get a free API key from: https://www.alphavantage.co/support/#api-key")
 
     def _rate_limit_check(self):
-        """Rate limiting for Alpha Vantage API (5 requests per minute for free tier)."""
+        """Rate limiting for Alpha Vantage API - minimal delay to be respectful."""
         current_time = time.time()
         time_since_last = current_time - self.last_request_time
         if time_since_last < self.min_request_interval:
