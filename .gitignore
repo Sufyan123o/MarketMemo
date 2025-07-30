@@ -48,6 +48,10 @@ dist/
 .coverage
 .coverage.*
 htmlcov/
+# Cache directories
+cache/                 # API response cache
+backend/cache/         # Backend cache directory
+*.cache
 .mypy_cache/
 .pytype/
 # Flask runtime bits
