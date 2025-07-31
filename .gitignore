@@ -61,7 +61,7 @@ backend/cache/         # Backend cache directory
 instance/              # per‑machine configs, uploads, etc.
 *.sqlite3
 *.db
-
+backend/*.json
 # ─────────────────── 5. Misc tooling ────────────────────────────────────────
 .poetry/               # Poetry virtual‑env in project
 Pipfile.lock           # Pipenv lock (if you don’t commit it)

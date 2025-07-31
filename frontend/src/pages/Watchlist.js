@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import { Star, Delete, Info, Article, OpenInNew, Close } from '@mui/icons-material';
 import { watchlistAPI, stockAPI } from '../services/api';
+import useLivePrices from '../hooks/useLivePrices';
 import toast from 'react-hot-toast';
 
 const Watchlist = () => {
@@ -29,6 +30,9 @@ const Watchlist = () => {
   const [stockData, setStockData] = useState({});
   const [loading, setLoading] = useState(true);
   const [newsDialog, setNewsDialog] = useState({ open: false, ticker: '', news: [], loading: false });
+
+  // Use the custom hook for live prices
+  const { livePrices, liveCount } = useLivePrices(watchlist);
 
   useEffect(() => {
     loadWatchlist();
@@ -141,13 +145,30 @@ const Watchlist = () => {
         </Card>
       ) : (
         <>
-          <Typography sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 3 }}>
-            You are watching {watchlist.length} stock{watchlist.length !== 1 ? 's' : ''}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+            <Typography sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+              You are watching {watchlist.length} stock{watchlist.length !== 1 ? 's' : ''}
+            </Typography>
+            {liveCount > 0 && (
+              <Chip
+                label={`${liveCount} Live Updates`}
+                size="small"
+                sx={{
+                  background: 'rgba(76, 175, 80, 0.2)',
+                  color: '#4CAF50',
+                  border: '1px solid #4CAF50',
+                }}
+              />
+            )}
+          </Box>
 
           <Grid container spacing={3}>
             {watchlist.map((ticker) => {
               const data = stockData[ticker];
+              const livePrice = livePrices[ticker];
+              // Use live price if available, otherwise fall back to cached data
+              const currentPrice = livePrice?.price || data?.current_price;
+              const isLive = !!livePrice?.price;
               return (
                 <Grid item xs={12} sm={6} md={4} key={ticker}>
                   <Card sx={{ 
@@ -209,9 +230,37 @@ const Watchlist = () => {
 
                       {data && (
                         <Box sx={{ mt: 2 }}>
-                          <Typography variant="h5" sx={{ color: 'white', mb: 1 }}>
-                            ${data.current_price?.toFixed(2) || 'N/A'}
-                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                            <Typography 
+                              variant="h5" 
+                              sx={{ 
+                                color: isLive ? '#4CAF50' : 'white',
+                                fontWeight: isLive ? 600 : 400,
+                                transition: 'color 0.3s ease'
+                              }}
+                            >
+                              ${currentPrice?.toFixed(2) || 'N/A'}
+                            </Typography>
+                            {isLive && (
+                              <Chip
+                                label="LIVE"
+                                size="small"
+                                sx={{
+                                  background: 'rgba(76, 175, 80, 0.2)',
+                                  color: '#4CAF50',
+                                  border: '1px solid #4CAF50',
+                                  fontSize: '0.7rem',
+                                  height: 20
+                                }}
+                              />
+                            )}
+                          </Box>
+                          
+                          {isLive && livePrice.timestamp && (
+                            <Typography variant="caption" sx={{ color: 'rgba(76, 175, 80, 0.8)', fontSize: '0.7rem', mb: 1 }}>
+                              Updated: {new Date(livePrice.timestamp).toLocaleTimeString()}
+                            </Typography>
+                          )}
                           
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                             <Chip

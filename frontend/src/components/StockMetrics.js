@@ -31,7 +31,7 @@ import {
 } from '@mui/icons-material';
 import { watchlistAPI } from '../services/api';
 
-const StockMetrics = ({ ticker, data, analysis }) => {
+const StockMetrics = ({ ticker, data, analysis, livePrice }) => {
   const [newsDialogOpen, setNewsDialogOpen] = useState(false);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
@@ -95,7 +95,8 @@ const StockMetrics = ({ ticker, data, analysis }) => {
 
   if (!data) return null;
 
-  const currentPrice = data.current_price || data.close_prices?.[data.close_prices.length - 1];
+  // Use live price if available, otherwise fall back to static data
+  const currentPrice = livePrice?.price || data.current_price || data.close_prices?.[data.close_prices.length - 1];
   const changePercent = data.change_percent || 0;
   
   // Safely extract sentiment value with multiple fallback checks
@@ -186,9 +187,12 @@ const StockMetrics = ({ ticker, data, analysis }) => {
         <Grid container spacing={2} sx={{ mt: 1 }}>
           <Grid item xs={6}>
             <Typography variant="body2" color="rgba(255, 255, 255, 0.7)">
-              Current Price
+              Current Price {livePrice && '🔴'}
             </Typography>
-            <Typography variant="h6" sx={{ color: 'white' }}>
+            <Typography 
+              variant="h6" 
+              sx={{ color: livePrice ? '#4CAF50' : 'white' }}
+            >
               ${currentPrice?.toFixed(2) || 'N/A'}
             </Typography>
           </Grid>

@@ -237,21 +237,21 @@ class StockDataService:
                             'has_historical_data': True
                         })
                         
-                        print(f"✅ Retrieved {len(dates)} days of historical data for {ticker}")
+                        print(f"Retrieved {len(dates)} days of historical data for {ticker}")
                     else:
-                        print(f"⚠️ No historical data found for {ticker} in date range {start_date} to {end_date}")
+                        print(f"No historical data found for {ticker} in date range {start_date} to {end_date}")
                         stock_data['has_historical_data'] = False
                 else:
-                    print(f"⚠️ Failed to get historical data for {ticker}")
+                    print(f"Failed to get historical data for {ticker}")
                     stock_data['has_historical_data'] = False
             else:
                 stock_data['has_historical_data'] = False
             
-            print(f"✅ Stock data compiled for {ticker}: Current price ${current_price}, Change {change_percent:.2f}%")
+            print(f"Stock data compiled for {ticker}: Current price ${current_price}, Change {change_percent:.2f}%")
             return stock_data
             
         except Exception as e:
-            print(f"❌ Error in get_stock_data for {ticker}: {e}")
+            print(f"Error in get_stock_data for {ticker}: {e}")
             return {
                 "error": "Data temporarily unavailable", 
                 "message": f"Error fetching data for {ticker}: {str(e)}"
@@ -323,21 +323,6 @@ class StockDataService:
         except Exception as e:
             print(f"Error fetching stock info for {ticker}: {e}")
             return None
-            
-            data = {
-                'ticker': ticker.upper(),
-                'company_name': overview_data.get('Name', ticker) if overview_data else ticker,
-                'current_price': current_price,
-                'market_cap': int(overview_data.get('MarketCapitalization', 0)) if overview_data and overview_data.get('MarketCapitalization') != 'None' else None,
-                'pe_ratio': float(overview_data.get('PERatio', 0)) if overview_data and overview_data.get('PERatio') != 'None' else None,
-                'change_percent': change_percent,
-                'volume': volume,
-                'sector': overview_data.get('Sector') if overview_data else None,
-                'industry': overview_data.get('Industry') if overview_data else None,
-            }
-            
-            return data
-            
         except Exception as e:
             print(f"Error fetching info for {ticker}: {e}")
             return None
@@ -346,7 +331,6 @@ class StockDataService:
         """Fetches financial news from NewsAPI."""
         if not self.news_api_key:
             return []
-            
         try:
             newsapi = NewsApiClient(api_key=self.news_api_key)
             response = newsapi.get_everything(

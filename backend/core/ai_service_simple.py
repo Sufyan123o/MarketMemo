@@ -90,7 +90,7 @@ class AIAnalysisService:
 💡 WHAT THIS MEANS FOR YOU:
 {recommendation}
 
-📰 KEY HEADLINES:
+KEY HEADLINES:
 """
         
         # Add top 3 headlines with simple explanations
@@ -105,7 +105,7 @@ class AIAnalysisService:
 • Always do more research before making investment decisions
 • Never invest more than you can afford to lose
 
-⚠️ IMPORTANT: This is news analysis only. Consider company fundamentals, market conditions, and your financial goals before investing.
+IMPORTANT: This is news analysis only. Consider company fundamentals, market conditions, and your financial goals before investing.
 """
         
         return summary

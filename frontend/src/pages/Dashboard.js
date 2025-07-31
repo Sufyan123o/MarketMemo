@@ -25,20 +25,26 @@ import StockMetrics from '../components/StockMetrics';
 import AIInsights from '../components/AIInsights';
 import { stockAPI } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import FinnhubSocket from '../services/FinnhubSocket';
+import useLivePrices from '../hooks/useLivePrices';
+import isMarketOpen from '../utils/marketHours';
 import toast from 'react-hot-toast';
 
 const MotionCard = motion(Card);
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const [tickersInput, setTickersInput] = useState('TSLA');
-  const [tickers, setTickers] = useState(['TSLA']);
+  const [tickersInput, setTickersInput] = useState('AAPL,MSFT,TSLA');
+  const [tickers, setTickers] = useState(['AAPL', 'MSFT', 'TSLA']);
   const [startDate, setStartDate] = useState(dayjs().subtract(6, 'month'));
   const [endDate, setEndDate] = useState(dayjs());
   const [investorLevel, setInvestorLevel] = useState('Beginner');
   const [loading, setLoading] = useState(false);
   const [stockData, setStockData] = useState({});
   const [analysisData, setAnalysisData] = useState({});
+
+  // Use the custom hook for live prices
+  const { livePrices, isConnected, liveCount } = useLivePrices(tickers);
 
   const handleAnalyze = async () => {
     if (!tickersInput.trim()) return;
@@ -227,19 +233,39 @@ const Dashboard = () => {
 
           {tickers.length > 0 && (
             <Box sx={{ mt: 2 }}>
-              {tickers.map((ticker) => (
-                <Chip
-                  key={ticker}
-                  label={ticker}
-                  sx={{
-                    mr: 1,
-                    mb: 1,
-                    background: 'rgba(54, 209, 220, 0.2)',
-                    color: '#36D1DC',
-                    border: '1px solid #36D1DC',
-                  }}
-                />
-              ))}
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)', mr: 2 }}>
+                  Tracking:
+                </Typography>
+                {liveCount > 0 && (
+                  <Chip
+                    label={`${liveCount} Live Updates`}
+                    size="small"
+                    sx={{
+                      background: 'rgba(76, 175, 80, 0.2)',
+                      color: '#4CAF50',
+                      border: '1px solid #4CAF50',
+                      fontSize: '0.75rem',
+                    }}
+                  />
+                )}
+              </Box>
+              {tickers.map((ticker) => {
+                const livePrice = livePrices[ticker];
+                return (
+                  <Chip
+                    key={ticker}
+                    label={livePrice ? `${ticker} - $${livePrice.price.toFixed(2)}` : ticker}
+                    sx={{
+                      mr: 1,
+                      mb: 1,
+                      background: livePrice ? 'rgba(76, 175, 80, 0.2)' : 'rgba(54, 209, 220, 0.2)',
+                      color: livePrice ? '#4CAF50' : '#36D1DC',
+                      border: livePrice ? '1px solid #4CAF50' : '1px solid #36D1DC',
+                    }}
+                  />
+                );
+              })}
             </Box>
           )}
         </CardContent>
@@ -257,7 +283,8 @@ const Dashboard = () => {
               <StockMetrics 
                 ticker={ticker} 
                 data={stockData[ticker]} 
-                analysis={analysisData[ticker]} 
+                analysis={analysisData[ticker]}
+                livePrice={livePrices[ticker]}
               />
             </Grid>
           ))}

@@ -3,13 +3,36 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import List, Optional
 import jwt
+import json
+import os
 from api.auth import SECRET_KEY, ALGORITHM, fake_users_db
 
 router = APIRouter()
 security = HTTPBearer(auto_error=False)
 
-# Mock watchlist database - using a default user for now
-user_watchlists = {"default_user": []}
+# Persistent watchlist database
+WATCHLISTS_FILE = "watchlists.json"
+
+def load_watchlists():
+    """Load watchlists from file"""
+    try:
+        if os.path.exists(WATCHLISTS_FILE):
+            with open(WATCHLISTS_FILE, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Error loading watchlists: {e}")
+    return {}
+
+def save_watchlists(watchlists_db):
+    """Save watchlists to file"""
+    try:
+        with open(WATCHLISTS_FILE, 'w') as f:
+            json.dump(watchlists_db, f, indent=2)
+    except Exception as e:
+        print(f"Error saving watchlists: {e}")
+
+# Load existing watchlists or create empty database
+user_watchlists = load_watchlists()
 
 class WatchlistItem(BaseModel):
     ticker: str
@@ -55,6 +78,7 @@ async def add_to_watchlist(
     
     if ticker not in user_watchlists[uid]:
         user_watchlists[uid].append(ticker)
+        save_watchlists(user_watchlists)  # Save to file
         return {"message": f"Added {ticker} to watchlist"}
     else:
         raise HTTPException(status_code=400, detail=f"{ticker} already in watchlist")
@@ -70,6 +94,7 @@ async def remove_from_watchlist(
     
     if uid in user_watchlists and ticker in user_watchlists[uid]:
         user_watchlists[uid].remove(ticker)
+        save_watchlists(user_watchlists)  # Save to file
         return {"message": f"Removed {ticker} from watchlist"}
     else:
         raise HTTPException(status_code=404, detail=f"{ticker} not found in watchlist")
