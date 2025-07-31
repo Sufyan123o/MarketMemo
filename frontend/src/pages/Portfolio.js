@@ -44,6 +44,7 @@ import {
   Close,
 } from '@mui/icons-material';
 import { portfolioAPI, stockAPI } from '../services/api';
+import useLivePrices from '../hooks/useLivePrices';
 
 const Portfolio = () => {
   const [portfolio, setPortfolio] = useState(null);
@@ -66,6 +67,10 @@ const Portfolio = () => {
   });
 
   const [formErrors, setFormErrors] = useState({});
+
+  // Get symbols from portfolio positions for live prices
+  const portfolioSymbols = portfolio?.positions ? Object.keys(portfolio.positions) : [];
+  const { livePrices, liveCount } = useLivePrices(portfolioSymbols);
 
   useEffect(() => {
     loadPortfolio();
@@ -270,7 +275,10 @@ const Portfolio = () => {
     let totalCurrentValue = 0;
 
     positions.forEach(position => {
-      const currentPrice = currentPrices[position.ticker]?.price || 0;
+      // Use live price if available, otherwise fall back to static price
+      const livePrice = livePrices[position.ticker]?.price;
+      const currentPrice = livePrice || currentPrices[position.ticker]?.price || 0;
+      
       const invested = position.quantity * position.avg_price;
       const currentValue = position.quantity * currentPrice;
       
@@ -308,9 +316,24 @@ const Portfolio = () => {
     <Container maxWidth="xl" sx={{ py: 4 }}>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Typography variant="h4" sx={{ color: 'white', fontWeight: 600 }}>
-          My Portfolio
-        </Typography>
+        <Box>
+          <Typography variant="h4" sx={{ color: 'white', fontWeight: 600 }}>
+            My Portfolio
+          </Typography>
+          {liveCount > 0 && (
+            <Chip
+              label={`${liveCount} Live Updates`}
+              size="small"
+              sx={{
+                mt: 1,
+                background: 'rgba(76, 175, 80, 0.2)',
+                color: '#4CAF50',
+                border: '1px solid #4CAF50',
+                fontSize: '0.75rem',
+              }}
+            />
+          )}
+        </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Button
             variant="outlined"
@@ -463,7 +486,11 @@ const Portfolio = () => {
                 </TableHead>
                 <TableBody>
                   {positions.map((position) => {
-                    const currentPrice = currentPrices[position.ticker]?.price || 0;
+                    // Use live price if available, otherwise fall back to static price
+                    const livePrice = livePrices[position.ticker]?.price;
+                    const currentPrice = livePrice || currentPrices[position.ticker]?.price || 0;
+                    const isLive = !!livePrice;
+                    
                     const currentValue = position.quantity * currentPrice;
                     const invested = position.quantity * position.avg_price;
                     const pl = currentValue - invested;
@@ -494,8 +521,30 @@ const Portfolio = () => {
                         </TableCell>
                         <TableCell sx={{ color: 'white' }}>{formatNumber(position.quantity)}</TableCell>
                         <TableCell sx={{ color: 'white' }}>{formatCurrency(position.avg_price)}</TableCell>
-                        <TableCell sx={{ color: 'white' }}>
-                          {currentPrice ? formatCurrency(currentPrice) : 'Loading...'}
+                        <TableCell>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography 
+                              sx={{ 
+                                color: isLive ? '#4CAF50' : 'white',
+                                fontWeight: isLive ? 600 : 400
+                              }}
+                            >
+                              {currentPrice ? formatCurrency(currentPrice) : 'Loading...'}
+                            </Typography>
+                            {isLive && (
+                              <Chip
+                                label="LIVE"
+                                size="small"
+                                sx={{
+                                  background: 'rgba(76, 175, 80, 0.2)',
+                                  color: '#4CAF50',
+                                  border: '1px solid #4CAF50',
+                                  fontSize: '0.65rem',
+                                  height: '16px',
+                                }}
+                              />
+                            )}
+                          </Box>
                         </TableCell>
                         <TableCell sx={{ color: 'white' }}>{formatCurrency(currentValue)}</TableCell>
                         <TableCell sx={{ color: pl >= 0 ? '#4CAF50' : '#F44336', fontWeight: 600 }}>
