@@ -81,16 +81,31 @@ export const portfolioAPI = {
   getPortfolio: () =>
     api.get('/api/portfolio'),
   
-  executeTrade: (ticker, action, quantity, price) =>
+  getPortfolioStats: () =>
+    api.get('/api/portfolio/stats'),
+  
+  executeTrade: (ticker, action, quantity, price, commission = 0) =>
     api.post('/api/portfolio/trade', {
       ticker,
       action,
       quantity,
-      price
+      price,
+      commission
     }),
   
   getTradeHistory: () =>
     api.get('/api/portfolio/trades'),
+  
+  getPnLBreakdown: () =>
+    api.get('/api/portfolio/trades/pnl-breakdown'),
+  
+  exportTradeHistory: () =>
+    api.get('/api/portfolio/trades/export', {
+      responseType: 'blob'
+    }),
+  
+  getLivePrice: (ticker) =>
+    api.get(`/api/portfolio/live-price/${ticker}`),
   
   resetPortfolio: () =>
     api.delete('/api/portfolio/reset'),
