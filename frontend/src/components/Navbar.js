@@ -17,6 +17,9 @@ import {
   Search,
   SportsEsports,
   MenuBook,
+  ExpandMore,
+  Assessment,
+  Today,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -26,6 +29,7 @@ const Navbar = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [anchorEl, setAnchorEl] = React.useState(null);
+  const [journalAnchorEl, setJournalAnchorEl] = React.useState(null);
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
@@ -33,6 +37,14 @@ const Navbar = () => {
 
   const handleClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleJournalMenu = (event) => {
+    setJournalAnchorEl(event.currentTarget);
+  };
+
+  const handleJournalClose = () => {
+    setJournalAnchorEl(null);
   };
 
   const handleLogout = () => {
@@ -47,7 +59,11 @@ const Navbar = () => {
     { label: 'Portfolio', path: '/portfolio', icon: <BusinessCenter /> },
     { label: 'Screener', path: '/screener', icon: <Search /> },
     { label: 'Playground', path: '/playground', icon: <SportsEsports /> },
-    { label: 'Journal', path: '/journal', icon: <MenuBook /> },
+  ];
+
+  const journalItems = [
+    { label: 'Dashboard', path: '/journal', icon: <Assessment /> },
+    { label: 'Daily Journaling', path: '/daily-journaling', icon: <Today /> },
   ];
 
   return (
@@ -94,6 +110,58 @@ const Navbar = () => {
                 {item.label}
               </Button>
             ))}
+            
+            {/* Journal Dropdown */}
+            <Button
+              color="inherit"
+              startIcon={<MenuBook />}
+              endIcon={<ExpandMore />}
+              onClick={handleJournalMenu}
+              sx={{
+                color: journalItems.some(item => location.pathname === item.path) ? '#36D1DC' : 'inherit',
+                '&:hover': {
+                  backgroundColor: 'rgba(54, 209, 220, 0.1)',
+                },
+              }}
+            >
+              Journal
+            </Button>
+            <Menu
+              anchorEl={journalAnchorEl}
+              open={Boolean(journalAnchorEl)}
+              onClose={handleJournalClose}
+              MenuListProps={{
+                'aria-labelledby': 'journal-button',
+              }}
+              PaperProps={{
+                sx: {
+                  background: 'rgba(15, 20, 25, 0.95)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                },
+              }}
+            >
+              {journalItems.map((item) => (
+                <MenuItem
+                  key={item.path}
+                  onClick={() => {
+                    navigate(item.path);
+                    handleJournalClose();
+                  }}
+                  sx={{
+                    color: location.pathname === item.path ? '#36D1DC' : 'inherit',
+                    '&:hover': {
+                      backgroundColor: 'rgba(54, 209, 220, 0.1)',
+                    },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {item.icon}
+                    {item.label}
+                  </Box>
+                </MenuItem>
+              ))}
+            </Menu>
             
             <IconButton
               size="large"

@@ -10,6 +10,7 @@ import Portfolio from './pages/Portfolio';
 import Screener from './pages/Screener';
 import Playground from './pages/Playground';
 import Journal from './pages/Journal';
+import DailyJournaling from './pages/DailyJournaling';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 function AppContent() {
@@ -48,6 +49,10 @@ function AppContent() {
         <Route 
           path="/journal" 
           element={user ? <Journal /> : <Navigate to="/login" />} 
+        />
+        <Route 
+          path="/daily-journaling" 
+          element={user ? <DailyJournaling /> : <Navigate to="/login" />} 
         />
       </Routes>
     </Box>
