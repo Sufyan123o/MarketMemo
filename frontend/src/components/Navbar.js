@@ -16,6 +16,7 @@ import {
   BusinessCenter,
   Search,
   SportsEsports,
+  MenuBook,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -46,6 +47,7 @@ const Navbar = () => {
     { label: 'Portfolio', path: '/portfolio', icon: <BusinessCenter /> },
     { label: 'Screener', path: '/screener', icon: <Search /> },
     { label: 'Playground', path: '/playground', icon: <SportsEsports /> },
+    { label: 'Journal', path: '/journal', icon: <MenuBook /> },
   ];
 
   return (

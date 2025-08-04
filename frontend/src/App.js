@@ -9,6 +9,7 @@ import Watchlist from './pages/Watchlist';
 import Portfolio from './pages/Portfolio';
 import Screener from './pages/Screener';
 import Playground from './pages/Playground';
+import Journal from './pages/Journal';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 function AppContent() {
@@ -43,6 +44,10 @@ function AppContent() {
         <Route 
           path="/playground" 
           element={user ? <Playground /> : <Navigate to="/login" />} 
+        />
+        <Route 
+          path="/journal" 
+          element={user ? <Journal /> : <Navigate to="/login" />} 
         />
       </Routes>
     </Box>
