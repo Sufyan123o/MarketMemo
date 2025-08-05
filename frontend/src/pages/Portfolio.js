@@ -276,7 +276,17 @@ const Portfolio = () => {
   const loadTradeHistory = async () => {
     try {
       const response = await portfolioAPI.getTradeHistory();
-      setTradeHistory(response.data.data);
+      // Sort trades by date/time - most recent first
+      const sortedTrades = (response.data.data || []).sort((a, b) => {
+        // Create comparable date strings
+        const dateA = new Date(`${a.trade_date || a.timestamp} ${a.trade_time || ''}`);
+        const dateB = new Date(`${b.trade_date || b.timestamp} ${b.trade_time || ''}`);
+        
+        // Sort by most recent first (descending order)
+        return dateB.getTime() - dateA.getTime();
+      });
+      
+      setTradeHistory(sortedTrades);
     } catch (error) {
       console.error('Error loading trade history:', error);
       setSnackbar({

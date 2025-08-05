@@ -53,9 +53,32 @@ user_portfolios = load_portfolios()
 
 def get_portfolio_data(user_id: str) -> Portfolio:
     """Load portfolio data for user or create default portfolio"""
-    if user_id in user_portfolios:
-        return Portfolio(**user_portfolios[user_id])
+    print(f"DEBUG: Looking for user_id: {user_id}")
+    print(f"DEBUG: Available users in portfolios: {list(user_portfolios.keys())}")
     
+    if user_id in user_portfolios:
+        print(f"DEBUG: Found existing portfolio for {user_id}")
+        portfolio_data = user_portfolios[user_id].copy()
+        
+        # Handle legacy data structure - convert 'holdings' to 'positions'
+        if 'holdings' in portfolio_data and 'positions' not in portfolio_data:
+            print(f"DEBUG: Converting holdings to positions for {user_id}")
+            portfolio_data['positions'] = portfolio_data.pop('holdings')
+        
+        # Ensure required fields exist
+        if 'positions' not in portfolio_data:
+            portfolio_data['positions'] = {}
+        if 'trades' not in portfolio_data:
+            portfolio_data['trades'] = []
+        if 'created_at' not in portfolio_data:
+            portfolio_data['created_at'] = datetime.now().isoformat()
+        if 'updated_at' not in portfolio_data:
+            portfolio_data['updated_at'] = datetime.now().isoformat()
+            
+        print(f"DEBUG: Portfolio data for {user_id} - trades count: {len(portfolio_data.get('trades', []))}")
+        return Portfolio(**portfolio_data)
+    
+    print(f"DEBUG: No existing portfolio found for {user_id}, creating default")
     # Create default portfolio with $100,000 starting cash
     default_portfolio = Portfolio(
         cash=100000.0,
@@ -399,8 +422,13 @@ async def get_portfolio_stats(current_user: dict = Depends(get_current_user)):
         # Calculate total realized P&L from all trades
         total_realized_pnl = sum(trade.get('realized_pnl', 0) for trade in portfolio.trades)
         
-        # Calculate initial portfolio value (starting cash)
-        initial_value = 100000.0  # Default starting amount
+        # Calculate actual initial investment from trade history
+        total_cash_spent = sum(trade.get('net_value', 0) for trade in portfolio.trades if trade.get('side') == 'BUY')
+        total_cash_received = sum(trade.get('net_value', 0) for trade in portfolio.trades if trade.get('side') == 'SELL')
+        net_cash_invested = total_cash_spent - total_cash_received
+        
+        # Use net cash invested as the initial value for return calculation
+        initial_value = net_cash_invested
         
         # Calculate current portfolio value (cash + positions value)
         # Note: Frontend will add current position values using live prices
@@ -413,7 +441,10 @@ async def get_portfolio_stats(current_user: dict = Depends(get_current_user)):
                 "positions": portfolio.positions,
                 "total_realized_pnl": total_realized_pnl,
                 "initial_value": initial_value,
-                "trade_count": len(portfolio.trades)
+                "trade_count": len(portfolio.trades),
+                "total_cash_spent": total_cash_spent,
+                "total_cash_received": total_cash_received,
+                "net_cash_invested": net_cash_invested
             }
         }
     except Exception as e:

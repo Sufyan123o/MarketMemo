@@ -7,42 +7,43 @@ import {
     Typography,
     Box,
     Button,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
     Table,
     TableBody,
     TableCell,
     TableContainer,
     TableHead,
     TableRow,
-    Paper,
     Chip,
     IconButton,
     Tooltip,
-    Snackbar,
-    Alert,
-    Divider,
-    LinearProgress,
     FormControl,
     InputLabel,
     Select,
     MenuItem,
     TextField,
+    Tab,
+    Tabs,
+    Avatar,
+    CircularProgress,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Paper,
 } from '@mui/material';
 import {
     TrendingUp,
-    TrendingDown,
-    Upload,
-    FileDownload,
+    CalendarToday,
+    Add,
+    Edit,
+    Info,
+    AccountBalance,
+    PieChart,
     Analytics,
-    ShowChart,
-    Timeline,
-    Assessment,
-    Close,
-    Refresh,
 } from '@mui/icons-material';
+import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs from 'dayjs';
 import { portfolioAPI } from '../services/api';
 import {
     Chart as ChartJS,
@@ -50,43 +51,284 @@ import {
     LinearScale,
     PointElement,
     LineElement,
-    BarElement,
     Title,
     Tooltip as ChartTooltip,
     Legend,
-    Filler,
 } from 'chart.js';
-import { Line, Bar, Scatter } from 'react-chartjs-2';
+import { Line } from 'react-chartjs-2';
 
 ChartJS.register(
     CategoryScale,
     LinearScale,
     PointElement,
     LineElement,
-    BarElement,
     Title,
     ChartTooltip,
-    Legend,
-    Filler
+    Legend
 );
 
 const Journal = () => {
-    const [tradeHistory, setTradeHistory] = useState([]);
-    const [importedTrades, setImportedTrades] = useState([]);
-    const [allTrades, setAllTrades] = useState([]);
+    const [selectedDate, setSelectedDate] = useState(dayjs());
+    const [tabValue, setTabValue] = useState(0);
     const [loading, setLoading] = useState(true);
-    const [importDialogOpen, setImportDialogOpen] = useState(false);
-    const [importFile, setImportFile] = useState(null);
-    const [importing, setImporting] = useState(false);
-    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-    const [timeRange, setTimeRange] = useState('all');
-    const [chartData, setChartData] = useState(null);
-    const [heatmapData, setHeatmapData] = useState(null);
-    const [instrumentData, setInstrumentData] = useState(null);
-    const [winRateData, setWinRateData] = useState(null);
     const [portfolioStats, setPortfolioStats] = useState(null);
+    const [trades, setTrades] = useState([]);
+    const [allTrades, setAllTrades] = useState([]); // Store all trades for filtering
+    const [portfolio, setPortfolio] = useState(null);
+    const [cumulativePnLData, setCumulativePnLData] = useState([]);
+    const [dateRange, setDateRange] = useState('all'); // Add date range state
+    const [calendarData, setCalendarData] = useState({}); // Add calendar data state
+    const [currentCalendarMonth, setCurrentCalendarMonth] = useState(dayjs()); // Add calendar month state
+    const [notes, setNotes] = useState([]); // Add notes state
+    const [showAddNote, setShowAddNote] = useState(false); // Add note dialog state
+    const [newNoteText, setNewNoteText] = useState(''); // Add note text state
+    const [editingNoteIndex, setEditingNoteIndex] = useState(-1); // Add edit note state
+    const [editNoteText, setEditNoteText] = useState(''); // Add edit note text state
 
-    // Format currency
+    useEffect(() => {
+        loadJournalData();
+    }, []);
+
+    // Filter trades when allTrades changes
+    useEffect(() => {
+        if (allTrades.length > 0) {
+            filterTradesByDateRange(dateRange);
+        }
+    }, [allTrades]);
+
+    const loadJournalData = async () => {
+        try {
+            setLoading(true);
+            
+            // Load portfolio stats and trade history
+            const [statsRes, tradesRes, portfolioRes] = await Promise.all([
+                portfolioAPI.getPortfolioStats(),
+                portfolioAPI.getTradeHistory(),
+                portfolioAPI.getPortfolio()
+            ]);
+
+            console.log('Journal Debug - Stats Response:', JSON.stringify(statsRes, null, 2));
+            console.log('Journal Debug - Trades Response:', JSON.stringify(tradesRes, null, 2));
+            console.log('Journal Debug - Portfolio Response:', JSON.stringify(portfolioRes, null, 2));
+
+            // The actual data is nested: response.data.data (not just response.data)
+            setPortfolioStats(statsRes.data.data);
+            // Store all trades and set initial filtered trades
+            const tradesData = Array.isArray(tradesRes.data.data) ? tradesRes.data.data : [];
+            setAllTrades(tradesData);
+            setTrades(tradesData); // Initially show all trades
+            setPortfolio(portfolioRes.data.data);
+            
+            // Calculate cumulative P&L data for chart
+            calculateCumulativePnL(tradesData);
+            
+            // Calculate calendar data
+            calculateCalendarData(tradesData);
+            
+            // Load notes from localStorage
+            loadNotes();
+            
+        } catch (error) {
+            console.error('Error loading journal data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const filterTradesByDateRange = (dateRangeValue) => {
+        if (!Array.isArray(allTrades)) return;
+
+        const now = dayjs();
+        let filteredTrades = allTrades;
+
+        switch (dateRangeValue) {
+            case 'today':
+                filteredTrades = allTrades.filter(trade => 
+                    dayjs(trade.trade_date).isSame(now, 'day')
+                );
+                break;
+            case 'week':
+                filteredTrades = allTrades.filter(trade => 
+                    dayjs(trade.trade_date).isAfter(now.subtract(7, 'day'))
+                );
+                break;
+            case 'month':
+                filteredTrades = allTrades.filter(trade => 
+                    dayjs(trade.trade_date).isAfter(now.subtract(1, 'month'))
+                );
+                break;
+            case 'quarter':
+                filteredTrades = allTrades.filter(trade => 
+                    dayjs(trade.trade_date).isAfter(now.subtract(3, 'month'))
+                );
+                break;
+            case 'year':
+                filteredTrades = allTrades.filter(trade => 
+                    dayjs(trade.trade_date).isAfter(now.subtract(1, 'year'))
+                );
+                break;
+            case 'all':
+            default:
+                filteredTrades = allTrades;
+                break;
+        }
+
+        setTrades(filteredTrades);
+        calculateCumulativePnL(filteredTrades);
+        calculateCalendarData(filteredTrades);
+    };
+
+    const calculateCalendarData = (tradesData) => {
+        if (!Array.isArray(tradesData)) return;
+
+        const calendarMap = {};
+        
+        tradesData.forEach(trade => {
+            const date = trade.trade_date;
+            if (!calendarMap[date]) {
+                calendarMap[date] = {
+                    totalPnL: 0,
+                    tradeCount: 0,
+                    trades: []
+                };
+            }
+            
+            calendarMap[date].totalPnL += (trade.realized_pnl || 0);
+            calendarMap[date].tradeCount += 1;
+            calendarMap[date].trades.push(trade);
+        });
+
+        setCalendarData(calendarMap);
+    };
+
+    const loadNotes = () => {
+        const savedNotes = localStorage.getItem('tradingNotes');
+        if (savedNotes) {
+            setNotes(JSON.parse(savedNotes));
+        }
+    };
+
+    const addNote = (noteText) => {
+        const newNote = {
+            id: Date.now(),
+            text: noteText,
+            timestamp: dayjs().format('h:mm A MM/DD/YYYY'),
+            date: dayjs().format('YYYY-MM-DD')
+        };
+        
+        const updatedNotes = [newNote, ...notes];
+        setNotes(updatedNotes);
+        localStorage.setItem('tradingNotes', JSON.stringify(updatedNotes));
+        setShowAddNote(false);
+    };
+
+    const handleDateRangeChange = (event) => {
+        const newDateRange = event.target.value;
+        setDateRange(newDateRange);
+        filterTradesByDateRange(newDateRange);
+    };
+
+    const calculateCumulativePnL = (tradesData) => {
+        // Ensure tradesData is an array
+        if (!Array.isArray(tradesData)) {
+            console.log('Journal Debug - calculateCumulativePnL received non-array:', tradesData);
+            setCumulativePnLData([]);
+            return;
+        }
+        
+        // Sort trades by date
+        const sortedTrades = [...tradesData].sort((a, b) => 
+            new Date(a.trade_date) - new Date(b.trade_date)
+        );
+
+        let cumulativePnL = 0;
+        const chartData = [];
+        
+        sortedTrades.forEach((trade) => {
+            const realizedPnL = trade.realized_pnl || 0;
+            cumulativePnL += realizedPnL;
+            
+            chartData.push({
+                date: trade.trade_date,
+                cumulativePnL: cumulativePnL,
+                trade: trade
+            });
+        });
+
+        setCumulativePnLData(chartData);
+    };
+
+    const calculateActualStats = () => {
+        console.log('Journal Debug - calculateActualStats called');
+        console.log('Journal Debug - portfolioStats:', portfolioStats);
+        console.log('Journal Debug - trades type:', typeof trades);
+        console.log('Journal Debug - trades isArray:', Array.isArray(trades));
+        console.log('Journal Debug - trades length:', trades?.length);
+        console.log('Journal Debug - trades sample:', Array.isArray(trades) ? trades.slice(0, 3) : trades);
+        
+        if (!portfolioStats || !Array.isArray(trades) || trades.length === 0) {
+            console.log('Journal Debug - No portfolioStats or no valid trades array, returning zeros');
+            return {
+                totalPnL: 0,
+                profitFactor: 0,
+                winningTrades: 0,
+                winningDays: 0,
+                avgWinLoss: 0
+            };
+        }
+
+        // Filter for only closed trades (trades with non-zero realized P&L)
+        const closedTrades = trades.filter(t => (t.realized_pnl || 0) !== 0);
+        const winningTrades = trades.filter(t => (t.realized_pnl || 0) > 0);
+        const losingTrades = trades.filter(t => (t.realized_pnl || 0) < 0);
+        
+        console.log('Journal Debug - Total trades:', trades.length);
+        console.log('Journal Debug - Closed trades:', closedTrades.length);
+        console.log('Journal Debug - Winning trades:', winningTrades.length);
+        console.log('Journal Debug - Losing trades:', losingTrades.length);
+        console.log('Journal Debug - portfolioStats.total_realized_pnl:', portfolioStats.total_realized_pnl);
+        
+        const totalWins = winningTrades.reduce((sum, t) => sum + (t.realized_pnl || 0), 0);
+        const totalLosses = Math.abs(losingTrades.reduce((sum, t) => sum + (t.realized_pnl || 0), 0));
+        
+        const profitFactor = totalLosses > 0 ? totalWins / totalLosses : totalWins > 0 ? 999 : 0;
+        // Calculate win rate based only on closed trades (excluding open positions with 0.0 P&L)
+        const winRate = closedTrades.length > 0 ? (winningTrades.length / closedTrades.length) * 100 : 0;
+        
+        // Calculate winning days based only on closed trades
+        const tradesByDate = {};
+        closedTrades.forEach(trade => {
+            const date = trade.trade_date;
+            if (!tradesByDate[date]) tradesByDate[date] = 0;
+            tradesByDate[date] += (trade.realized_pnl || 0);
+        });
+        
+        const tradingDays = Object.keys(tradesByDate);
+        const winningDays = tradingDays.filter(date => tradesByDate[date] > 0);
+        const winningDaysRate = tradingDays.length > 0 ? (winningDays.length / tradingDays.length) * 100 : 0;
+        
+        const avgWin = winningTrades.length > 0 ? totalWins / winningTrades.length : 0;
+        const avgLoss = losingTrades.length > 0 ? totalLosses / losingTrades.length : 0;
+
+        return {
+            totalPnL: portfolioStats.total_realized_pnl || 0,
+            profitFactor: profitFactor,
+            winningTrades: winRate,
+            winningDays: winningDaysRate,
+            avgWinLoss: avgWin,
+            avgWin: avgWin,
+            avgLoss: avgLoss,
+            totalTrades: trades.length,
+            closedTrades: closedTrades.length,
+            winningTradesCount: winningTrades.length,
+            losingTradesCount: losingTrades.length,
+            totalTradingDays: tradingDays.length,
+            winningDaysCount: winningDays.length
+        };
+    };
+
+    const actualStats = calculateActualStats();
+
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
@@ -94,1243 +336,986 @@ const Journal = () => {
         }).format(amount || 0);
     };
 
-    // Format date
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
+    const formatPercentage = (value) => {
+        return `${value}%`;
     };
 
-    // Load platform trade history
-    const loadTradeHistory = async () => {
-        try {
-            setLoading(true);
-            const response = await portfolioAPI.getTradeHistory();
-            setTradeHistory(response.data.data || []);
-        } catch (error) {
-            console.error('Error loading trade history:', error);
-            setSnackbar({
-                open: true,
-                message: 'Failed to load trade history',
-                severity: 'error'
-            });
-        } finally {
-            setLoading(false);
+    const getTradeColor = (pnl) => {
+        return pnl >= 0 ? '#4CAF50' : '#f44336';
+    };
+
+    const handleTabChange = (event, newValue) => {
+        setTabValue(newValue);
+    };
+
+    const handleEditNote = (index) => {
+        setEditingNoteIndex(index);
+        setEditNoteText(notes[index].text);
+    };
+
+    const handleSaveEditNote = () => {
+        if (editNoteText.trim()) {
+            const updatedNotes = [...notes];
+            updatedNotes[editingNoteIndex] = {
+                ...updatedNotes[editingNoteIndex],
+                text: editNoteText.trim(),
+                lastModified: new Date().toISOString()
+            };
+            setNotes(updatedNotes);
+            localStorage.setItem('tradingNotes', JSON.stringify(updatedNotes));
+            setEditingNoteIndex(-1);
+            setEditNoteText('');
         }
     };
 
-    // Parse CSV file
-    const parseCSV = (csvText) => {
-        const lines = csvText.trim().split('\n');
-        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-        const trades = [];
-
-        for (let i = 1; i < lines.length; i++) {
-            const values = [];
-            let currentValue = '';
-            let inQuotes = false;
-
-            for (let j = 0; j < lines[i].length; j++) {
-                const char = lines[i][j];
-                if (char === '"') {
-                    inQuotes = !inQuotes;
-                } else if (char === ',' && !inQuotes) {
-                    values.push(currentValue.trim());
-                    currentValue = '';
-                } else {
-                    currentValue += char;
-                }
-            }
-            values.push(currentValue.trim());
-
-            if (values.length === headers.length) {
-                const trade = {};
-                headers.forEach((header, index) => {
-                    trade[header] = values[index];
-                });
-                trades.push(trade);
-            }
-        }
-
-        return trades;
+    const handleCancelEdit = () => {
+        setEditingNoteIndex(-1);
+        setEditNoteText('');
     };
 
-    // Handle CSV import
-    const handleImport = async () => {
-        if (!importFile) return;
-
-        setImporting(true);
-        try {
-            const text = await importFile.text();
-            const trades = parseCSV(text);
-
-            // Validate that this looks like our trade format
-            const requiredFields = ['trade_id', 'symbol', 'side', 'quantity', 'price', 'trade_date'];
-            const hasRequiredFields = requiredFields.every(field =>
-                trades.length > 0 && trades[0].hasOwnProperty(field)
-            );
-
-            if (!hasRequiredFields) {
-                throw new Error('Invalid CSV format. Please use the export format from this platform.');
-            }
-
-            setImportedTrades(trades);
-            setImportDialogOpen(false);
-            setSnackbar({
-                open: true,
-                message: `Successfully imported ${trades.length} trades`,
-                severity: 'success'
-            });
-        } catch (error) {
-            setSnackbar({
-                open: true,
-                message: `Import failed: ${error.message}`,
-                severity: 'error'
-            });
-        } finally {
-            setImporting(false);
+    const handleAddNote = () => {
+        if (newNoteText.trim()) {
+            addNote(newNoteText.trim());
+            setNewNoteText('');
+            setShowAddNote(false);
         }
     };
-
-    // Calculate cumulative P&L over time
-    const calculateCumulativePnL = (trades) => {
-        if (!trades || trades.length === 0) return { dates: [], pnl: [], totalPnL: 0 };
-
-        // Sort trades by date
-        const sortedTrades = [...trades].sort((a, b) => {
-            const dateA = new Date(a.trade_date || a.timestamp);
-            const dateB = new Date(b.trade_date || b.timestamp);
-            return dateA - dateB;
-        });
-
-        const dates = [];
-        const pnl = [];
-        let cumulativePnL = 0;
-
-        sortedTrades.forEach(trade => {
-            const tradeDate = new Date(trade.trade_date || trade.timestamp);
-            const realizedPnL = parseFloat(trade.realized_pnl || 0);
-
-            // Add realized P&L only for sell trades
-            if (trade.side === 'SELL' || trade.action === 'sell') {
-                cumulativePnL += realizedPnL;
-            }
-
-            dates.push(tradeDate.toLocaleDateString());
-            pnl.push(cumulativePnL);
-        });
-
-        return { dates, pnl, totalPnL: cumulativePnL };
-    };
-
-    // Filter trades by time range
-    const filterTradesByTimeRange = (trades, range) => {
-        if (range === 'all') return trades;
-
-        const now = new Date();
-        let cutoffDate;
-
-        switch (range) {
-            case '1m':
-                cutoffDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-                break;
-            case '3m':
-                cutoffDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
-                break;
-            case '6m':
-                cutoffDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
-                break;
-            case '1y':
-                cutoffDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-                break;
-            default:
-                return trades;
-        }
-
-        return trades.filter(trade => {
-            const tradeDate = new Date(trade.trade_date || trade.timestamp);
-            return tradeDate >= cutoffDate;
-        });
-    };
-
-    // Generate chart data
-    const generateChartData = () => {
-        const filteredTradeHistory = filterTradesByTimeRange(tradeHistory, timeRange);
-        const filteredImportedTrades = filterTradesByTimeRange(importedTrades, timeRange);
-        
-        const platformData = calculateCumulativePnL(filteredTradeHistory);
-        const importedData = calculateCumulativePnL(filteredImportedTrades);
-        const combinedTrades = [...filteredTradeHistory, ...filteredImportedTrades];
-        const combinedData = calculateCumulativePnL(combinedTrades);
-
-        const data = {
-            labels: combinedData.dates,
-            datasets: [
-                {
-                    label: 'Cumulative P&L',
-                    data: combinedData.pnl,
-                    borderColor: '#5B86E5',
-                    backgroundColor: 'rgba(91, 134, 229, 0.1)',
-                    fill: true,
-                    tension: 0.4,
-                    borderWidth: 3,
-                }
-            ]
-        };
-
-        if (tradeHistory.length > 0 && importedTrades.length > 0) {
-            // Show separate lines for platform vs imported trades
-            data.datasets = [
-                {
-                    label: 'Platform Trades P&L',
-                    data: platformData.pnl,
-                    borderColor: '#4CAF50',
-                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-                    fill: false,
-                    tension: 0.4,
-                    borderWidth: 2,
-                },
-                {
-                    label: 'Imported Trades P&L',
-                    data: importedData.pnl,
-                    borderColor: '#FF9800',
-                    backgroundColor: 'rgba(255, 152, 0, 0.1)',
-                    fill: false,
-                    tension: 0.4,
-                    borderWidth: 2,
-                },
-                {
-                    label: 'Combined P&L',
-                    data: combinedData.pnl,
-                    borderColor: '#5B86E5',
-                    backgroundColor: 'rgba(91, 134, 229, 0.1)',
-                    fill: true,
-                    tension: 0.4,
-                    borderWidth: 3,
-                }
-            ];
-        }
-
-        setChartData(data);
-
-        // Calculate portfolio stats
-        setPortfolioStats({
-            totalTrades: combinedTrades.length,
-            platformTrades: filteredTradeHistory.length,
-            importedTrades: filteredImportedTrades.length,
-            totalPnL: combinedData.totalPnL,
-            platformPnL: platformData.totalPnL,
-            importedPnL: importedData.totalPnL,
-        });
-    };
-
-    // Generate P&L heatmap by weekday and hour
-    const generateHeatmapData = () => {
-        const filteredTradeHistory = filterTradesByTimeRange(tradeHistory, timeRange);
-        const filteredImportedTrades = filterTradesByTimeRange(importedTrades, timeRange);
-        const combinedTrades = [...filteredTradeHistory, ...filteredImportedTrades];
-
-        // Only process SELL trades for P&L
-        const sellTrades = combinedTrades.filter(trade => 
-            (trade.side === 'SELL' || trade.action === 'sell')
-        );
-
-        // Initialize weekday/hour grid
-        const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const hours = Array.from({ length: 24 }, (_, i) => i);
-        const heatmapGrid = {};
-
-        weekdays.forEach(day => {
-            heatmapGrid[day] = {};
-            hours.forEach(hour => {
-                heatmapGrid[day][hour] = { pnl: 0, count: 0 };
-            });
-        });
-
-        // Aggregate P&L by weekday and hour
-        sellTrades.forEach(trade => {
-            let tradeDate;
-            let hour;
-            
-            // Try to get hour from timestamp first, then fall back to trade_time
-            if (trade.timestamp) {
-                tradeDate = new Date(trade.timestamp);
-                hour = tradeDate.getHours();
-            } else if (trade.trade_time) {
-                // Parse trade_time format "HH:MM:SS"
-                const timeParts = trade.trade_time.split(':');
-                hour = parseInt(timeParts[0]);
-                tradeDate = new Date(trade.trade_date || trade.timestamp);
-            } else {
-                // Fallback to a default trade date
-                tradeDate = new Date(trade.trade_date || trade.timestamp);
-                hour = tradeDate.getHours();
-            }
-            
-            const weekday = weekdays[tradeDate.getDay()];
-            
-            // Parse realized_pnl more carefully
-            let realizedPnL = 0;
-            if (trade.realized_pnl !== undefined && trade.realized_pnl !== null) {
-                realizedPnL = parseFloat(trade.realized_pnl);
-                if (isNaN(realizedPnL)) {
-                    console.warn(`Invalid P&L for trade ${trade.trade_id}:`, trade.realized_pnl);
-                    realizedPnL = 0;
-                }
-            }
-
-            if (weekday && hour >= 0 && hour <= 23) {
-                heatmapGrid[weekday][hour].pnl += realizedPnL;
-                heatmapGrid[weekday][hour].count += 1;
-            }
-        });
-
-        // Convert to heatmap format
-        const heatmapData = [];
-        let totalPnLPoints = 0;
-        let totalTradeCount = 0;
-        
-        weekdays.forEach((day, dayIndex) => {
-            hours.forEach(hour => {
-                const data = heatmapGrid[day][hour];
-                // Include all points that have trades, regardless of P&L
-                if (data.count > 0) {
-                    heatmapData.push({
-                        x: hour,
-                        y: dayIndex,
-                        v: data.pnl,
-                        count: data.count,
-                        day: day,
-                        hour: hour
-                    });
-                    totalPnLPoints += data.pnl;
-                    totalTradeCount += data.count;
-                }
-            });
-        });
-
-        if (heatmapData.length === 0) {
-            setHeatmapData(null);
-            return;
-        }
-
-        const data = {
-            datasets: [{
-                label: 'P&L by Time',
-                data: heatmapData,
-                backgroundColor: (ctx) => {
-                    const value = ctx.parsed ? ctx.parsed.v : (ctx.raw ? ctx.raw.v : 0);
-                    
-                    if (value > 0) {
-                        const intensity = Math.min(Math.abs(value) / 100, 1); // Scale to max $100 for full intensity
-                        return `rgba(76, 175, 80, ${0.3 + intensity * 0.7})`;
-                    } else if (value < 0) {
-                        const intensity = Math.min(Math.abs(value) / 100, 1);
-                        return `rgba(244, 67, 54, ${0.3 + intensity * 0.7})`;
-                    }
-                    return 'rgba(128, 128, 128, 0.4)'; // Gray for zero P&L
-                },
-                borderColor: 'rgba(255, 255, 255, 0.5)',
-                borderWidth: 1,
-                pointRadius: (ctx) => {
-                    // Handle different context structures from Chart.js
-                    let count = 1;
-                    if (ctx.parsed && ctx.parsed.count !== undefined) {
-                        count = ctx.parsed.count;
-                    } else if (ctx.raw && ctx.raw.count !== undefined) {
-                        count = ctx.raw.count;
-                    } else if (ctx.element && ctx.element.$context && ctx.element.$context.raw) {
-                        count = ctx.element.$context.raw.count || 1;
-                    }
-                    return Math.max(8, Math.min(count * 3, 20)); // Size based on trade count
-                },
-            }]
-        };
-
-        setHeatmapData(data);
-    };
-
-    // Generate P&L by instrument (symbol) bar chart
-    const generateInstrumentData = () => {
-        const filteredTradeHistory = filterTradesByTimeRange(tradeHistory, timeRange);
-        const filteredImportedTrades = filterTradesByTimeRange(importedTrades, timeRange);
-        const combinedTrades = [...filteredTradeHistory, ...filteredImportedTrades];
-
-        // Track P&L by individual symbol
-        const symbolPnL = {};
-
-        combinedTrades.forEach(trade => {
-            if (trade.side === 'SELL' || trade.action === 'sell') {
-                const symbol = trade.symbol || trade.ticker;
-                const realizedPnL = parseFloat(trade.realized_pnl || 0);
-                
-                if (!symbolPnL[symbol]) {
-                    symbolPnL[symbol] = 0;
-                }
-                symbolPnL[symbol] += realizedPnL;
-            }
-        });
-
-        const labels = Object.keys(symbolPnL);
-        const values = Object.values(symbolPnL);
-
-        const data = {
-            labels: labels,
-            datasets: [{
-                label: 'P&L by Symbol',
-                data: values,
-                backgroundColor: values.map(value => 
-                    value >= 0 ? 'rgba(76, 175, 80, 0.8)' : 'rgba(244, 67, 54, 0.8)'
-                ),
-                borderColor: values.map(value => 
-                    value >= 0 ? '#4CAF50' : '#F44336'
-                ),
-                borderWidth: 2,
-            }]
-        };
-
-        setInstrumentData(data);
-    };
-
-    // Generate Win Rate vs Win/Loss Ratio scatter chart
-    const generateWinRateData = () => {
-        const filteredTradeHistory = filterTradesByTimeRange(tradeHistory, timeRange);
-        const filteredImportedTrades = filterTradesByTimeRange(importedTrades, timeRange);
-        const combinedTrades = [...filteredTradeHistory, ...filteredImportedTrades];
-
-        console.log('Total combined trades:', combinedTrades.length);
-
-        // Only process closed trades (SELL trades with P&L data)
-        const closedTrades = combinedTrades.filter(trade => {
-            // Include SELL trades with P&L data
-            const isSellTrade = (trade.side === 'SELL' || trade.action === 'sell');
-            const hasPnLData = trade.realized_pnl !== undefined && 
-                              trade.realized_pnl !== null && 
-                              trade.realized_pnl !== '' &&
-                              trade.realized_pnl !== 0; // Exclude zero P&L trades
-            return isSellTrade && hasPnLData;
-        });
-
-        console.log('Closed trades with P&L:', closedTrades.length);
-        console.log('Sample closed trades:', closedTrades.slice(0, 3));
-
-        // Group by symbol and calculate metrics
-        const symbolMetrics = {};
-
-        closedTrades.forEach(trade => {
-            const symbol = trade.symbol || trade.ticker;
-            const pnl = parseFloat(trade.realized_pnl || 0);
-
-            if (!symbolMetrics[symbol]) {
-                symbolMetrics[symbol] = {
-                    symbol: symbol,
-                    totalTrades: 0,
-                    wins: 0,
-                    losses: 0,
-                    winAmounts: [],
-                    lossAmounts: [],
-                    totalPnL: 0
-                };
-            }
-
-            symbolMetrics[symbol].totalTrades++;
-            symbolMetrics[symbol].totalPnL += pnl;
-
-            if (pnl > 0) {
-                symbolMetrics[symbol].wins++;
-                symbolMetrics[symbol].winAmounts.push(pnl);
-            } else if (pnl < 0) {
-                symbolMetrics[symbol].losses++;
-                symbolMetrics[symbol].lossAmounts.push(Math.abs(pnl));
-            }
-        });
-
-        console.log('Symbol metrics:', symbolMetrics);
-
-        // Calculate final metrics for each symbol
-        const scatterData = [];
-        let maxRatio = 0;
-
-        Object.values(symbolMetrics).forEach(metrics => {
-            // Reduce minimum trades requirement to 1 to see all symbols
-            if (metrics.totalTrades < 1) return; 
-
-            const totalDecisiveTrades = metrics.wins + metrics.losses;
-            if (totalDecisiveTrades === 0) return; // Skip if no wins or losses
-
-            // Calculate win rate (0-100%)
-            const winRate = (metrics.wins / totalDecisiveTrades) * 100;
-
-            // Calculate average win and loss amounts
-            const avgWin = metrics.winAmounts.length > 0 
-                ? metrics.winAmounts.reduce((sum, amount) => sum + amount, 0) / metrics.winAmounts.length 
-                : 0;
-            
-            const avgLoss = metrics.lossAmounts.length > 0 
-                ? metrics.lossAmounts.reduce((sum, amount) => sum + amount, 0) / metrics.lossAmounts.length 
-                : 0;
-
-            // Calculate win/loss ratio
-            let winLossRatio;
-            let isInfinite = false;
-
-            if (metrics.losses === 0) {
-                // No losses - infinite ratio
-                winLossRatio = Infinity;
-                isInfinite = true;
-            } else if (metrics.wins === 0) {
-                // No wins - ratio is 0
-                winLossRatio = 0;
-            } else {
-                winLossRatio = avgWin / avgLoss;
-            }
-
-            if (!isInfinite) {
-                maxRatio = Math.max(maxRatio, winLossRatio);
-            }
-
-            console.log(`${metrics.symbol}: Win Rate: ${winRate.toFixed(1)}%, Wins: ${metrics.wins}, Losses: ${metrics.losses}, Ratio: ${isInfinite ? '∞' : winLossRatio.toFixed(2)}`);
-
-            scatterData.push({
-                x: winRate,
-                y: isInfinite ? null : winLossRatio, // Will handle infinite values separately
-                symbol: metrics.symbol,
-                totalTrades: metrics.totalTrades,
-                wins: metrics.wins,
-                losses: metrics.losses,
-                winRate: winRate,
-                winLossRatio: winLossRatio,
-                avgWin: avgWin,
-                avgLoss: avgLoss,
-                totalPnL: metrics.totalPnL,
-                isInfinite: isInfinite
-            });
-        });
-
-        console.log('Scatter data points:', scatterData.length);
-        console.log('Scatter data:', scatterData);
-
-        if (scatterData.length === 0) {
-            setWinRateData(null);
-            return;
-        }
-
-        // Handle infinite ratios by placing them at the top of the chart
-        const chartTopValue = Math.max(maxRatio * 1.1, 1); // Ensure minimum top value of 1
-        scatterData.forEach(point => {
-            if (point.isInfinite) {
-                point.y = chartTopValue;
-            }
-        });
-
-        const data = {
-            datasets: [{
-                label: 'Win % vs Win/Loss Ratio',
-                data: scatterData,
-                backgroundColor: (ctx) => {
-                    const point = ctx.raw;
-                    // Color based on total P&L
-                    if (point.totalPnL > 0) {
-                        return 'rgba(76, 175, 80, 0.8)'; // Green for profitable symbols
-                    } else if (point.totalPnL < 0) {
-                        return 'rgba(244, 67, 54, 0.8)'; // Red for losing symbols
-                    }
-                    return 'rgba(158, 158, 158, 0.8)'; // Gray for break-even
-                },
-                borderColor: (ctx) => {
-                    const point = ctx.raw;
-                    if (point.totalPnL > 0) {
-                        return '#4CAF50';
-                    } else if (point.totalPnL < 0) {
-                        return '#F44336';
-                    }
-                    return '#9E9E9E';
-                },
-                borderWidth: 2,
-                pointRadius: (ctx) => {
-                    // Size based on total number of trades (min 6, max 20)
-                    const point = ctx.raw;
-                    return Math.max(6, Math.min(point.totalTrades * 1.5, 20));
-                },
-                pointHoverRadius: (ctx) => {
-                    const point = ctx.raw;
-                    return Math.max(8, Math.min(point.totalTrades * 1.5 + 2, 22));
-                }
-            }]
-        };
-
-        setWinRateData(data);
-    };
-
-    // Win Rate scatter chart options
-    const winRateOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                labels: { color: 'white', font: { size: 12 } }
-            },
-            title: {
-                display: true,
-                text: 'Win Rate vs Win/Loss Ratio by Symbol',
-                color: 'white',
-                font: { size: 16, weight: 'bold' }
-            },
-            tooltip: {
-                backgroundColor: 'rgba(26, 32, 44, 0.9)',
-                titleColor: 'white',
-                bodyColor: 'white',
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-                borderWidth: 1,
-                callbacks: {
-                    title: function(context) {
-                        const point = context[0].raw;
-                        return point.symbol;
-                    },
-                    label: function(context) {
-                        const point = context.raw;
-                        const ratioText = point.isInfinite ? '∞ (no losses)' : point.winLossRatio.toFixed(2);
-                        
-                        return [
-                            `Total Trades: ${point.totalTrades}`,
-                            `Wins: ${point.wins}, Losses: ${point.losses}`,
-                            `Win Rate: ${point.winRate.toFixed(1)}%`,
-                            `Win/Loss Ratio: ${ratioText}`,
-                            `Avg Win: ${formatCurrency(point.avgWin)}`,
-                            `Avg Loss: ${formatCurrency(point.avgLoss)}`,
-                            `Total P&L: ${formatCurrency(point.totalPnL)}`
-                        ];
-                    }
-                }
-            }
-        },
-        scales: {
-            x: {
-                type: 'linear',
-                position: 'bottom',
-                min: 0,
-                max: 100,
-                title: {
-                    display: true,
-                    text: 'Win Rate (%)',
-                    color: 'white',
-                    font: { size: 14, weight: 'bold' }
-                },
-                grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                ticks: { 
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    callback: function(value) {
-                        return value + '%';
-                    }
-                }
-            },
-            y: {
-                type: 'linear',
-                min: 0,
-                title: {
-                    display: true,
-                    text: 'Win/Loss Ratio',
-                    color: 'white',
-                    font: { size: 14, weight: 'bold' }
-                },
-                grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                ticks: { 
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    callback: function(value) {
-                        return value.toFixed(1);
-                    }
-                }
-            }
-        },
-        elements: {
-            point: {
-                hoverRadius: 8
-            }
-        }
-    };
-
-    // Chart options
-    const chartOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'top',
-                labels: {
-                    color: 'white',
-                    font: { size: 12 }
-                }
-            },
-            title: {
-                display: true,
-                text: 'Cumulative P&L Over Time',
-                color: 'white',
-                font: { size: 16, weight: 'bold' }
-            },
-            tooltip: {
-                backgroundColor: 'rgba(26, 32, 44, 0.9)',
-                titleColor: 'white',
-                bodyColor: 'white',
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-                borderWidth: 1,
-                callbacks: {
-                    label: function (context) {
-                        return `${context.dataset.label}: ${formatCurrency(context.parsed.y)}`;
-                    }
-                }
-            }
-        },
-        scales: {
-            x: {
-                grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                ticks: { color: 'rgba(255, 255, 255, 0.7)' }
-            },
-            y: {
-                grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                ticks: {
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    callback: function (value) {
-                        return formatCurrency(value);
-                    }
-                }
-            }
-        }
-    };
-
-    // Heatmap chart options
-    const heatmapOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: { display: false },
-            title: {
-                display: true,
-                text: 'P&L Heatmap by Weekday & Hour',
-                color: 'white',
-                font: { size: 16, weight: 'bold' }
-            },
-            tooltip: {
-                backgroundColor: 'rgba(26, 32, 44, 0.9)',
-                titleColor: 'white',
-                bodyColor: 'white',
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-                borderWidth: 1,
-                callbacks: {
-                    title: function(context) {
-                        const point = context[0];
-                        const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                        const hour = point.parsed.x;
-                        const day = weekdays[point.parsed.y];
-                        return `${day} at ${hour}:00`;
-                    },
-                    label: function(context) {
-                        const pnl = context.parsed.v || context.raw.v || 0;
-                        const count = context.raw.count || 1;
-                        
-                        return [
-                            `P&L: ${formatCurrency(pnl)}`,
-                            `Trades: ${count}`,
-                            `Avg P&L: ${formatCurrency(pnl / count)}`
-                        ];
-                    }
-                }
-            }
-        },
-        scales: {
-            x: {
-                type: 'linear',
-                position: 'bottom',
-                min: 0,
-                max: 23,
-                ticks: { 
-                    stepSize: 1,
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    callback: function(value) {
-                        return value + ':00';
-                    }
-                },
-                title: {
-                    display: true,
-                    text: 'Hour of Day',
-                    color: 'white'
-                },
-                grid: { color: 'rgba(255, 255, 255, 0.1)' }
-            },
-            y: {
-                type: 'linear',
-                min: 0,
-                max: 6,
-                ticks: { 
-                    stepSize: 1,
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    callback: function(value) {
-                        const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                        return weekdays[value];
-                    }
-                },
-                title: {
-                    display: true,
-                    text: 'Day of Week',
-                    color: 'white'
-                },
-                grid: { color: 'rgba(255, 255, 255, 0.1)' }
-            }
-        }
-    };
-
-    // Bar chart options
-    const barOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                labels: { color: 'white', font: { size: 12 } }
-            },
-            title: {
-                display: true,
-                text: 'P&L by Symbol',
-                color: 'white',
-                font: { size: 16, weight: 'bold' }
-            },
-            tooltip: {
-                backgroundColor: 'rgba(26, 32, 44, 0.9)',
-                titleColor: 'white',
-                bodyColor: 'white',
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-                borderWidth: 1,
-                callbacks: {
-                    label: function(context) {
-                        return `P&L: ${formatCurrency(context.parsed.y)}`;
-                    }
-                }
-            }
-        },
-        scales: {
-            x: {
-                grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                ticks: { color: 'rgba(255, 255, 255, 0.7)' }
-            },
-            y: {
-                grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                ticks: {
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    callback: function(value) {
-                        return formatCurrency(value);
-                    }
-                }
-            }
-        }
-    };
-
-    // Effects
-    useEffect(() => {
-        loadTradeHistory();
-    }, []);
-
-    useEffect(() => {
-        const filteredTradeHistory = filterTradesByTimeRange(tradeHistory, timeRange);
-        const filteredImportedTrades = filterTradesByTimeRange(importedTrades, timeRange);
-        const filteredAllTrades = [...filteredTradeHistory, ...filteredImportedTrades];
-        
-        setAllTrades(filteredAllTrades);
-        generateChartData();
-        generateHeatmapData();
-        generateInstrumentData();
-        generateWinRateData();
-    }, [tradeHistory, importedTrades, timeRange]);
 
     if (loading) {
         return (
-            <Container maxWidth="xl" sx={{ py: 4 }}>
-                <Typography variant="h4" sx={{ color: 'white', mb: 3 }}>
-                    Loading Journal...
-                </Typography>
-                <LinearProgress />
+            <Container maxWidth="xl" sx={{ py: 3, px: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+                    <CircularProgress size={60} sx={{ color: '#36D1DC' }} />
+                </Box>
             </Container>
         );
     }
 
     return (
-        <Container maxWidth="xl" sx={{ py: 4 }}>
-            {/* Header */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-                <Typography variant="h4" sx={{ color: 'white', fontWeight: 600 }}>
-                    Trading Journal
+        <Container maxWidth="xl" sx={{ py: 3, px: 2 }}>
+            {/* Header Section */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h4" sx={{ color: '#36D1DC', fontWeight: 700 }}>
+                    Dashboard
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Button
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                    <Button 
                         variant="outlined"
-                        startIcon={<Upload />}
-                        onClick={() => setImportDialogOpen(true)}
-                        sx={{ color: '#5B86E5', borderColor: '#5B86E5' }}
+                        onClick={() => window.location.href = '/daily-journal'}
+                        sx={{ 
+                            borderColor: '#36D1DC',
+                            color: '#36D1DC',
+                            '&:hover': { borderColor: '#5B86E5', backgroundColor: 'rgba(54, 209, 220, 0.1)' }
+                        }}
                     >
-                        Import Trades
+                        Daily Journal View
                     </Button>
-                    <Button
-                        variant="outlined"
-                        startIcon={<Refresh />}
-                        onClick={loadTradeHistory}
-                        sx={{ color: '#4CAF50', borderColor: '#4CAF50' }}
-                    >
-                        Refresh
-                    </Button>
+                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                        <InputLabel>Date Range</InputLabel>
+                        <Select 
+                            value={dateRange} 
+                            label="Date Range"
+                            onChange={handleDateRangeChange}
+                        >
+                            <MenuItem value="all">All Time</MenuItem>
+                            <MenuItem value="today">Today</MenuItem>
+                            <MenuItem value="week">Last 7 Days</MenuItem>
+                            <MenuItem value="month">Last Month</MenuItem>
+                            <MenuItem value="quarter">Last 3 Months</MenuItem>
+                            <MenuItem value="year">Last Year</MenuItem>
+                        </Select>
+                    </FormControl>
+                    <FormControl size="small" sx={{ minWidth: 120 }}>
+                        <InputLabel>All Accounts</InputLabel>
+                        <Select value="all" label="All Accounts">
+                            <MenuItem value="all">All Accounts</MenuItem>
+                            <MenuItem value="main">Main Account</MenuItem>
+                            <MenuItem value="demo">Demo Account</MenuItem>
+                        </Select>
+                    </FormControl>
+                    <IconButton sx={{ color: '#666' }}>
+                        <CalendarToday />
+                    </IconButton>
+                    <IconButton sx={{ color: '#666' }}>
+                        <Info />
+                    </IconButton>
                 </Box>
             </Box>
 
-            {/* Stats Cards */}
-            {portfolioStats && (
-                <Grid container spacing={3} sx={{ mb: 4 }}>
-                    <Grid item xs={12} sm={6} md={3}>
-                        <Card sx={{ background: 'rgba(26, 32, 44, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                            <CardContent sx={{ textAlign: 'center' }}>
-                                <Timeline sx={{ color: '#5B86E5', fontSize: 40, mb: 1 }} />
-                                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
-                                    {portfolioStats.totalTrades}
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                                    Total Trades
-                                </Typography>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-
-                    <Grid item xs={12} sm={6} md={3}>
-                        <Card sx={{ background: 'rgba(26, 32, 44, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                            <CardContent sx={{ textAlign: 'center' }}>
-                                {portfolioStats.totalPnL >= 0 ? (
-                                    <TrendingUp sx={{ color: '#4CAF50', fontSize: 40, mb: 1 }} />
-                                ) : (
-                                    <TrendingDown sx={{ color: '#F44336', fontSize: 40, mb: 1 }} />
-                                )}
-                                <Typography variant="h6" sx={{ color: portfolioStats.totalPnL >= 0 ? '#4CAF50' : '#F44336', fontWeight: 600 }}>
-                                    {formatCurrency(portfolioStats.totalPnL)}
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                                    Total P&L
-                                </Typography>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-
-                    <Grid item xs={12} sm={6} md={3}>
-                        <Card sx={{ background: 'rgba(26, 32, 44, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                            <CardContent sx={{ textAlign: 'center' }}>
-                                <ShowChart sx={{ color: '#4CAF50', fontSize: 40, mb: 1 }} />
-                                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
-                                    {portfolioStats.platformTrades}
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                                    Platform Trades
-                                </Typography>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-
-                    <Grid item xs={12} sm={6} md={3}>
-                        <Card sx={{ background: 'rgba(26, 32, 44, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                            <CardContent sx={{ textAlign: 'center' }}>
-                                <Upload sx={{ color: '#FF9800', fontSize: 40, mb: 1 }} />
-                                <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
-                                    {portfolioStats.importedTrades}
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                                    Imported Trades
-                                </Typography>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-                </Grid>
-            )}
-
-            {/* P&L Chart */}
-            <Card sx={{ background: 'rgba(26, 32, 44, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)', mb: 4 }}>
-                <CardContent>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                        <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
-                            P&L Performance
-                        </Typography>
-                        <FormControl size="small" sx={{ minWidth: 120 }}>
-                            <InputLabel sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>Time Range</InputLabel>
-                            <Select
-                                value={timeRange}
-                                onChange={(e) => setTimeRange(e.target.value)}
-                                sx={{ color: 'white', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.3)' } }}
-                            >
-                                <MenuItem value="all">All Time</MenuItem>
-                                <MenuItem value="1m">Last Month</MenuItem>
-                                <MenuItem value="3m">Last 3 Months</MenuItem>
-                                <MenuItem value="6m">Last 6 Months</MenuItem>
-                                <MenuItem value="1y">Last Year</MenuItem>
-                            </Select>
-                        </FormControl>
-                    </Box>
-
-                    {chartData ? (
-                        <Box sx={{ height: 400 }}>
-                            <Line data={chartData} options={chartOptions} />
-                        </Box>
-                    ) : (
-                        <Box sx={{ textAlign: 'center', py: 8 }}>
-                            <Assessment sx={{ fontSize: 60, color: 'rgba(255, 255, 255, 0.3)', mb: 2 }} />
-                            <Typography variant="h6" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                                No trade data available
+            {/* Key Metrics Cards */}
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} sm={6} md={2.4}>
+                    <Card sx={{ 
+                        height: '100%', 
+                        backgroundColor: 'rgba(15, 20, 25, 0.95)', 
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                        <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                                <AccountBalance sx={{ color: '#36D1DC', mr: 1 }} />
+                                <Tooltip title="Total Portfolio & Leverage">
+                                    <Info sx={{ fontSize: 16, color: 'rgba(255, 255, 255, 0.5)' }} />
+                                </Tooltip>
+                            </Box>
+                            <Typography variant="h5" sx={{ fontWeight: 600, color: actualStats.totalPnL >= 0 ? '#4CAF50' : '#f44336' }}>
+                                {formatCurrency(actualStats.totalPnL)}
                             </Typography>
-                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
-                                Start trading or import your trade history to see performance analysis
+                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                                Total Realized P&L
                             </Typography>
-                        </Box>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* Additional Analytics Charts */}
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-                {/* P&L Heatmap */}
-                <Grid item xs={12} lg={4}>
-                    <Card sx={{ background: 'rgba(26, 32, 44, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                        <CardContent>
-                            <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 3 }}>
-                                P&L Heatmap by Time
-                            </Typography>
-                            {heatmapData ? (
-                                <Box sx={{ height: 300 }}>
-                                    <Scatter data={heatmapData} options={heatmapOptions} />
-                                </Box>
-                            ) : (
-                                <Box sx={{ textAlign: 'center', py: 4 }}>
-                                    <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                                        No data available for heatmap
-                                    </Typography>
-                                </Box>
-                            )}
                         </CardContent>
                     </Card>
                 </Grid>
 
-                {/* P&L by Symbol */}
-                <Grid item xs={12} lg={4}>
-                    <Card sx={{ background: 'rgba(26, 32, 44, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                        <CardContent>
-                            <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 3 }}>
-                                P&L by Symbol
+                <Grid item xs={12} sm={6} md={2.4}>
+                    <Card sx={{ 
+                        height: '100%', 
+                        backgroundColor: 'rgba(15, 20, 25, 0.95)', 
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                        <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                                <PieChart sx={{ color: '#36D1DC', mr: 1 }} />
+                                <Tooltip title={`For every dollar you lost, you made $${actualStats.profitFactor.toFixed(2)} in profits. Values > 1.0 indicate profitable trading performance.`}>
+                                    <Info sx={{ fontSize: 16, color: 'rgba(255, 255, 255, 0.5)' }} />
+                                </Tooltip>
+                            </Box>
+                            <Typography variant="h5" sx={{ fontWeight: 600, color: '#fff' }}>
+                                {actualStats.profitFactor.toFixed(2)}
                             </Typography>
-                            {instrumentData ? (
-                                <Box sx={{ height: 300 }}>
-                                    <Bar data={instrumentData} options={barOptions} />
+                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                                Profit Factor
+                            </Typography>
+                            <Box sx={{ mt: 1, height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Box 
+                                    sx={{ 
+                                        width: 60, 
+                                        height: 60, 
+                                        borderRadius: '50%',
+                                        background: `conic-gradient(#4CAF50 0deg ${Math.min((Math.max(actualStats.profitFactor, 0) / 5) * 360, 360)}deg, rgba(255, 255, 255, 0.1) ${Math.min((Math.max(actualStats.profitFactor, 0) / 5) * 360, 360)}deg 360deg)`,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '12px',
+                                        fontWeight: 600,
+                                        color: '#fff'
+                                    }}
+                                >
+                                    {actualStats.profitFactor.toFixed(1)}
                                 </Box>
-                            ) : (
-                                <Box sx={{ textAlign: 'center', py: 4 }}>
-                                    <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                                        No data available for instrument analysis
-                                    </Typography>
-                                </Box>
-                            )}
+                            </Box>
                         </CardContent>
                     </Card>
                 </Grid>
 
-                {/* Win Rate vs Win/Loss Ratio */}
-                <Grid item xs={12} lg={4}>
-                    <Card sx={{ background: 'rgba(26, 32, 44, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                        <CardContent>
-                            <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, mb: 3 }}>
-                                Win Rate vs Win/Loss Ratio
+                <Grid item xs={12} sm={6} md={2.4}>
+                    <Card sx={{ 
+                        height: '100%', 
+                        backgroundColor: 'rgba(15, 20, 25, 0.95)', 
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                        <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                                <TrendingUp sx={{ color: '#36D1DC', mr: 1 }} />
+                                <Tooltip title={`Out of ${actualStats.closedTrades} closed trades, you profited on ${actualStats.winningTradesCount} trades (${actualStats.winningTrades.toFixed(1)}%).`}>
+                                    <Info sx={{ fontSize: 16, color: 'rgba(255, 255, 255, 0.5)' }} />
+                                </Tooltip>
+                            </Box>
+                            <Typography variant="h5" sx={{ fontWeight: 600, color: '#fff' }}>
+                                {actualStats.winningTrades.toFixed(1)}%
                             </Typography>
-                            {winRateData ? (
-                                <Box sx={{ height: 300 }}>
-                                    <Scatter data={winRateData} options={winRateOptions} />
+                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                                Winning Trades %
+                            </Typography>
+                            <Box sx={{ mt: 1, display: 'flex', gap: 0.5 }}>
+                                <Box sx={{ 
+                                    width: `${actualStats.winningTrades}%`, 
+                                    height: 8, 
+                                    backgroundColor: '#4CAF50', 
+                                    borderRadius: 1 
+                                }} />
+                                <Box sx={{ 
+                                    width: `${100 - actualStats.winningTrades}%`, 
+                                    height: 8, 
+                                    backgroundColor: '#f44336', 
+                                    borderRadius: 1 
+                                }} />
+                            </Box>
+                            <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)', mt: 1, display: 'block' }}>
+                                {actualStats.winningTradesCount}W - {actualStats.losingTradesCount}L ({actualStats.closedTrades} closed / {actualStats.totalTrades} total)
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={2.4}>
+                    <Card sx={{ 
+                        height: '100%', 
+                        backgroundColor: 'rgba(15, 20, 25, 0.95)', 
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                        <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                                <CalendarToday sx={{ color: '#36D1DC', mr: 1 }} />
+                                <Tooltip title={`Out of ${actualStats.totalTradingDays} trading days, you profited on ${actualStats.winningDaysCount} days (${actualStats.winningDays.toFixed(1)}%).`}>
+                                    <Info sx={{ fontSize: 16, color: 'rgba(255, 255, 255, 0.5)' }} />
+                                </Tooltip>
+                            </Box>
+                            <Typography variant="h5" sx={{ fontWeight: 600, color: '#fff' }}>
+                                {actualStats.winningDays.toFixed(1)}%
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                                Winning Days %
+                            </Typography>
+                            <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.2, justifyContent: 'center', height: 32 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', height: 8 }}>
+                                    <Box sx={{ 
+                                        width: `${actualStats.winningDays}%`, 
+                                        height: 8, 
+                                        backgroundColor: '#4CAF50', 
+                                        borderRadius: '4px 0 0 4px' 
+                                    }} />
+                                    <Box sx={{ 
+                                        width: `${100 - actualStats.winningDays}%`, 
+                                        height: 8, 
+                                        backgroundColor: '#f44336', 
+                                        borderRadius: '0 4px 4px 0' 
+                                    }} />
                                 </Box>
-                            ) : (
-                                <Box sx={{ textAlign: 'center', py: 4 }}>
-                                    <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                                        No data available for win rate analysis
-                                    </Typography>
-                                </Box>
-                            )}
+                                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: 10 }}>
+                                    {actualStats.winningDaysCount}W - {actualStats.totalTradingDays - actualStats.winningDaysCount}L days
+                                </Typography>
+                            </Box>
+                        </CardContent>
+                    </Card>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={2.4}>
+                    <Card sx={{ 
+                        height: '100%', 
+                        backgroundColor: 'rgba(15, 20, 25, 0.95)', 
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                        <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                                <Analytics sx={{ color: '#36D1DC', mr: 1 }} />
+                                <Tooltip title="Average Win/Loss $">
+                                    <Info sx={{ fontSize: 16, color: 'rgba(255, 255, 255, 0.5)' }} />
+                                </Tooltip>
+                            </Box>
+                            <Typography variant="h5" sx={{ fontWeight: 600, color: '#fff' }}>
+                                {formatCurrency(actualStats.avgWinLoss)}
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                                Avg Win/Loss $
+                            </Typography>
+                            <Box sx={{ mt: 1, height: 40, display: 'flex', alignItems: 'end', gap: 0.5, justifyContent: 'center' }}>
+                                {/* Visual representation of win vs loss ratio */}
+                                <Box sx={{ 
+                                    width: `${Math.max(20, Math.min(80, (actualStats.avgWin / Math.max(actualStats.avgWin, Math.abs(actualStats.avgLoss))) * 100))}%`, 
+                                    height: 8, 
+                                    backgroundColor: '#4CAF50', 
+                                    borderRadius: 1 
+                                }} />
+                                <Box sx={{ 
+                                    width: `${Math.max(20, Math.min(80, (Math.abs(actualStats.avgLoss) / Math.max(actualStats.avgWin, Math.abs(actualStats.avgLoss))) * 100))}%`, 
+                                    height: 8, 
+                                    backgroundColor: '#f44336', 
+                                    borderRadius: 1 
+                                }} />
+                            </Box>
+                            <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)', mt: 1, display: 'block' }}>
+                                Win: {formatCurrency(actualStats.avgWin)} | Loss: {formatCurrency(actualStats.avgLoss)}
+                            </Typography>
                         </CardContent>
                     </Card>
                 </Grid>
             </Grid>
 
-            {/* Trade History Table */}
-            <Card sx={{ background: 'rgba(26, 32, 44, 0.9)', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                <CardContent>
-                    <Typography variant="h6" sx={{ color: 'white', mb: 3, fontWeight: 600 }}>
-                        Trade History ({allTrades.length} trades)
-                    </Typography>
+            {/* Main Content Area */}
+            <Grid container spacing={3}>
+                {/* Left Side - Trades List and Calendar */}
+                <Grid item xs={12} md={8}>
+                    <Card sx={{ 
+                        mb: 3,
+                        backgroundColor: 'rgba(15, 20, 25, 0.95)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                        <CardContent>
+                            <Box sx={{ borderBottom: 1, borderColor: 'rgba(255, 255, 255, 0.1)', mb: 2 }}>
+                                <Tabs 
+                                    value={tabValue} 
+                                    onChange={handleTabChange}
+                                    sx={{
+                                        '& .MuiTab-root': { color: 'rgba(255, 255, 255, 0.7)' },
+                                        '& .Mui-selected': { color: '#36D1DC !important' },
+                                        '& .MuiTabs-indicator': { backgroundColor: '#36D1DC' }
+                                    }}
+                                >
+                                    <Tab label="Trades" />
+                                    <Tab label="Notes" />
+                                </Tabs>
+                            </Box>
 
-                    <TableContainer>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', fontWeight: 600 }}>Date</TableCell>
-                                    <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', fontWeight: 600 }}>Symbol</TableCell>
-                                    <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', fontWeight: 600 }}>Side</TableCell>
-                                    <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', fontWeight: 600 }}>Quantity</TableCell>
-                                    <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', fontWeight: 600 }}>Price</TableCell>
-                                    <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', fontWeight: 600 }}>Value</TableCell>
-                                    <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', fontWeight: 600 }}>P&L</TableCell>
-                                    <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', fontWeight: 600 }}>Source</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {allTrades.slice(0, 50).map((trade, index) => {
-                                    const isImported = importedTrades.includes(trade);
-                                    const realizedPnL = parseFloat(trade.realized_pnl || 0);
+                            {tabValue === 0 && (
+                                <Box>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                                        <Typography variant="h6" sx={{ color: '#fff' }}>
+                                            Recent Trades
+                                            {dateRange !== 'all' && (
+                                                <Typography component="span" variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.5)', ml: 1 }}>
+                                                    ({trades.length} trades in selected period)
+                                                </Typography>
+                                            )}
+                                        </Typography>
+                                        <Box>
+                                            <Button 
+                                                variant="outlined" 
+                                                size="small" 
+                                                startIcon={<Add />}
+                                                onClick={() => setShowAddNote(true)}
+                                                sx={{ 
+                                                    mr: 1,
+                                                    borderColor: '#36D1DC',
+                                                    color: '#36D1DC',
+                                                    '&:hover': { borderColor: '#5B86E5', backgroundColor: 'rgba(54, 209, 220, 0.1)' }
+                                                }}
+                                            >
+                                                Add Note
+                                            </Button>
+                                            <Button 
+                                                variant="text" 
+                                                size="small"
+                                                sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
+                                            >
+                                                View Trading Day
+                                            </Button>
+                                        </Box>
+                                    </Box>
 
-                                    return (
-                                        <TableRow key={trade.trade_id || index} sx={{ '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.05)' } }}>
-                                            <TableCell sx={{ color: 'white' }}>
-                                                {formatDate(trade.trade_date || trade.timestamp)}
-                                            </TableCell>
-                                            <TableCell sx={{ color: 'white', fontWeight: 600 }}>
-                                                {trade.symbol || trade.ticker}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Chip
-                                                    label={trade.side || trade.action?.toUpperCase()}
-                                                    size="small"
-                                                    sx={{
-                                                        bgcolor: (trade.side === 'BUY' || trade.action === 'buy') ? 'rgba(76, 175, 80, 0.2)' : 'rgba(244, 67, 54, 0.2)',
-                                                        color: (trade.side === 'BUY' || trade.action === 'buy') ? '#4CAF50' : '#F44336',
-                                                        fontWeight: 600
+                                    <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                                        {(trades && Array.isArray(trades) ? trades.slice(0, 10) : []).map((trade, index) => (
+                                            <Box key={trade.trade_id || index} sx={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                py: 1.5, 
+                                                borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                                                '&:last-child': { borderBottom: 'none' }
+                                            }}>
+                                                <Box sx={{ mr: 2 }}>
+                                                    <Chip 
+                                                        label={trade.side} 
+                                                        size="small"
+                                                        sx={{
+                                                            backgroundColor: trade.side === 'BUY' ? 'rgba(76, 175, 80, 0.2)' : 'rgba(244, 67, 54, 0.2)',
+                                                            color: trade.side === 'BUY' ? '#4CAF50' : '#f44336',
+                                                            border: `1px solid ${trade.side === 'BUY' ? '#4CAF50' : '#f44336'}`,
+                                                            fontWeight: 600,
+                                                            fontSize: '10px'
+                                                        }}
+                                                    />
+                                                </Box>
+                                                <Box sx={{ mr: 2 }}>
+                                                    <Avatar sx={{ width: 24, height: 24, bgcolor: '#36D1DC', fontSize: 11, fontWeight: 600 }}>
+                                                        {trade.symbol.charAt(0)}
+                                                    </Avatar>
+                                                </Box>
+                                                <Box sx={{ flex: 1 }}>
+                                                    <Typography variant="body2" sx={{ fontWeight: 500, color: '#fff' }}>
+                                                        {trade.symbol} • {trade.quantity} shares @ {formatCurrency(trade.price)}
+                                                    </Typography>
+                                                    <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                                                        {trade.trade_date} {trade.trade_time}
+                                                    </Typography>
+                                                </Box>
+                                                <Box sx={{ textAlign: 'right', mr: 1 }}>
+                                                    <Typography variant="body2" sx={{ 
+                                                        fontWeight: 600, 
+                                                        color: getTradeColor(trade.realized_pnl || 0)
+                                                    }}>
+                                                        {formatCurrency(trade.realized_pnl || 0)}
+                                                    </Typography>
+                                                    <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+                                                        P&L
+                                                    </Typography>
+                                                </Box>
+                                                <IconButton size="small" sx={{ color: '#36D1DC' }}>
+                                                    <Edit fontSize="small" />
+                                                </IconButton>
+                                            </Box>
+                                        ))}
+                                        {(!trades || !Array.isArray(trades) || trades.length === 0) && (
+                                            <Box sx={{ textAlign: 'center', py: 4 }}>
+                                                <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+                                                    No trades found
+                                                </Typography>
+                                            </Box>
+                                        )}
+                                    </Box>
+                                </Box>
+                            )}
+
+                            {tabValue === 1 && (
+                                <Box sx={{ p: 2 }}>
+                                    {notes.length === 0 ? (
+                                        <Typography color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                                            No notes yet. Add your first trading note using the "Add Note" button above.
+                                        </Typography>
+                                    ) : (
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                            {notes.map((note, index) => (
+                                                <Paper 
+                                                    key={index} 
+                                                    sx={{ 
+                                                        p: 2, 
+                                                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                                        position: 'relative'
                                                     }}
-                                                />
-                                            </TableCell>
-                                            <TableCell sx={{ color: 'white' }}>
-                                                {parseInt(trade.quantity).toLocaleString()}
-                                            </TableCell>
-                                            <TableCell sx={{ color: 'white' }}>
-                                                {formatCurrency(parseFloat(trade.price))}
-                                            </TableCell>
-                                            <TableCell sx={{ color: 'white' }}>
-                                                {formatCurrency(parseFloat(trade.gross_value || trade.value || 0))}
-                                            </TableCell>
-                                            <TableCell sx={{ color: realizedPnL >= 0 ? '#4CAF50' : '#F44336', fontWeight: 600 }}>
-                                                {realizedPnL !== 0 ? formatCurrency(realizedPnL) : '-'}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Chip
-                                                    label={isImported ? 'Imported' : 'Platform'}
-                                                    size="small"
-                                                    sx={{
-                                                        bgcolor: isImported ? 'rgba(255, 152, 0, 0.2)' : 'rgba(91, 134, 229, 0.2)',
-                                                        color: isImported ? '#FF9800' : '#5B86E5',
-                                                        fontWeight: 600
-                                                    }}
-                                                />
-                                            </TableCell>
+                                                >
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {new Date(note.timestamp).toLocaleString()}
+                                                            {note.lastModified && (
+                                                                <Typography component="span" variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.4)', ml: 1 }}>
+                                                                    (edited: {new Date(note.lastModified).toLocaleString()})
+                                                                </Typography>
+                                                            )}
+                                                        </Typography>
+                                                        <IconButton 
+                                                            size="small" 
+                                                            onClick={() => handleEditNote(index)}
+                                                            sx={{ 
+                                                                color: '#36D1DC',
+                                                                '&:hover': { backgroundColor: 'rgba(54, 209, 220, 0.1)' }
+                                                            }}
+                                                        >
+                                                            <Edit fontSize="small" />
+                                                        </IconButton>
+                                                    </Box>
+                                                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                                                        {note.text}
+                                                    </Typography>
+                                                </Paper>
+                                            ))}
+                                        </Box>
+                                    )}
+                                </Box>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Calendar View */}
+                    <Card sx={{
+                        backgroundColor: 'rgba(15, 20, 25, 0.95)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                        <CardContent>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                <Typography variant="h6" sx={{ color: '#fff' }}>
+                                    {currentCalendarMonth.format('MMMM YYYY')}
+                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <IconButton 
+                                        size="small" 
+                                        onClick={() => setCurrentCalendarMonth(prev => prev.subtract(1, 'month'))}
+                                        sx={{ color: '#36D1DC' }}
+                                    >
+                                        <Typography variant="caption">‹</Typography>
+                                    </IconButton>
+                                    <Button 
+                                        variant="outlined" 
+                                        size="small"
+                                        onClick={() => {
+                                            setCurrentCalendarMonth(dayjs());
+                                            const today = dayjs().format('YYYY-MM-DD');
+                                            if (calendarData[today]) {
+                                                console.log('Today\'s trades:', calendarData[today]);
+                                            }
+                                        }}
+                                        sx={{ 
+                                            borderColor: '#36D1DC',
+                                            color: '#36D1DC',
+                                            '&:hover': { borderColor: '#5B86E5', backgroundColor: 'rgba(54, 209, 220, 0.1)' }
+                                        }}
+                                    >
+                                        Today
+                                    </Button>
+                                    <IconButton 
+                                        size="small" 
+                                        onClick={() => setCurrentCalendarMonth(prev => prev.add(1, 'month'))}
+                                        sx={{ color: '#36D1DC' }}
+                                    >
+                                        <Typography variant="caption">›</Typography>
+                                    </IconButton>
+                                    <Tooltip title="Shows P&L and trade count for each day">
+                                        <IconButton size="small" sx={{ color: '#36D1DC' }}>
+                                            <Info />
+                                        </IconButton>
+                                    </Tooltip>
+                                </Box>
+                            </Box>
+
+                            {/* Calendar Grid */}
+                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1 }}>
+                                {/* Day Headers */}
+                                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                                    <Typography key={day} variant="caption" sx={{ textAlign: 'center', p: 1, fontWeight: 600, color: '#fff' }}>
+                                        {day}
+                                    </Typography>
+                                ))}
+                                
+                                {/* Calendar Days */}
+                                {(() => {
+                                    const today = dayjs();
+                                    const startOfMonth = currentCalendarMonth.startOf('month');
+                                    const startOfCalendar = startOfMonth.startOf('week');
+                                    const endOfMonth = currentCalendarMonth.endOf('month');
+                                    const endOfCalendar = endOfMonth.endOf('week');
+                                    
+                                    const days = [];
+                                    let currentDay = startOfCalendar;
+                                    
+                                    while (currentDay.isBefore(endOfCalendar) || currentDay.isSame(endOfCalendar, 'day')) {
+                                        days.push(currentDay);
+                                        currentDay = currentDay.add(1, 'day');
+                                    }
+                                    
+                                    return days.map((day, index) => {
+                                        const dateStr = day.format('YYYY-MM-DD');
+                                        const isCurrentMonth = day.isSame(currentCalendarMonth, 'month');
+                                        const isToday = day.isSame(today, 'day');
+                                        const dayData = calendarData[dateStr];
+                                        const hasTrading = dayData && dayData.tradeCount > 0;
+                                        
+                                        return (
+                                            <Box
+                                                key={index}
+                                                onClick={() => {
+                                                    if (hasTrading) {
+                                                        console.log(`Trades for ${dateStr}:`, dayData.trades);
+                                                        // Could open a modal or navigate to detailed view
+                                                    }
+                                                }}
+                                                sx={{
+                                                    minHeight: 60,
+                                                    p: 0.5,
+                                                    border: isToday ? '2px solid #36D1DC' : '1px solid rgba(255, 255, 255, 0.1)',
+                                                    backgroundColor: isCurrentMonth ? 
+                                                        (hasTrading ? 
+                                                            (dayData.totalPnL >= 0 ? 'rgba(76, 175, 80, 0.1)' : 'rgba(244, 67, 54, 0.1)') 
+                                                            : 'rgba(255, 255, 255, 0.05)') 
+                                                        : 'rgba(255, 255, 255, 0.02)',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    cursor: hasTrading ? 'pointer' : 'default',
+                                                    '&:hover': hasTrading ? { backgroundColor: 'rgba(54, 209, 220, 0.2)' } : {},
+                                                    borderRadius: 1
+                                                }}
+                                            >
+                                                <Typography variant="caption" sx={{ 
+                                                    color: isCurrentMonth ? (isToday ? '#36D1DC' : '#fff') : 'rgba(255, 255, 255, 0.5)',
+                                                    fontWeight: isToday ? 600 : 400
+                                                }}>
+                                                    {day.format('D')}
+                                                </Typography>
+                                                {hasTrading && (
+                                                    <Box sx={{ mt: 0.5, textAlign: 'center' }}>
+                                                        <Typography variant="caption" sx={{ 
+                                                            color: dayData.totalPnL >= 0 ? '#4CAF50' : '#f44336',
+                                                            fontWeight: 600,
+                                                            fontSize: 10
+                                                        }}>
+                                                            {formatCurrency(dayData.totalPnL)}
+                                                        </Typography>
+                                                        <Typography variant="caption" sx={{ 
+                                                            fontSize: 8, 
+                                                            color: 'rgba(255, 255, 255, 0.7)', 
+                                                            display: 'block' 
+                                                        }}>
+                                                            {dayData.tradeCount} trade{dayData.tradeCount !== 1 ? 's' : ''}
+                                                        </Typography>
+                                                    </Box>
+                                                )}
+                                            </Box>
+                                        );
+                                    });
+                                })()}
+                            </Box>
+                        </CardContent>
+                    </Card>
+                </Grid>
+
+                {/* Right Side - Open Positions and Charts */}
+                <Grid item xs={12} md={4}>
+                    {/* Open Positions */}
+                    <Card sx={{ 
+                        mb: 3,
+                        backgroundColor: 'rgba(15, 20, 25, 0.95)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                        <CardContent>
+                            <Typography variant="h6" gutterBottom sx={{ color: '#fff' }}>
+                                Current Positions
+                            </Typography>
+                            <Tooltip title="Current Portfolio Positions">
+                                <IconButton size="small" sx={{ float: 'right', mt: -5, color: '#36D1DC' }}>
+                                    <Info />
+                                </IconButton>
+                            </Tooltip>
+                            
+                            <TableContainer>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell sx={{ color: '#fff', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Symbol</TableCell>
+                                            <TableCell sx={{ color: '#fff', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Qty</TableCell>
+                                            <TableCell sx={{ color: '#fff', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Avg Price</TableCell>
+                                            <TableCell align="right" sx={{ color: '#fff', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Value</TableCell>
                                         </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {portfolio?.positions && Object.entries(portfolio.positions).map(([symbol, position]) => (
+                                            <TableRow key={symbol}>
+                                                <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                        <Avatar sx={{ width: 20, height: 20, bgcolor: '#36D1DC', fontSize: 10, mr: 1 }}>
+                                                            {symbol.charAt(0)}
+                                                        </Avatar>
+                                                        {symbol}
+                                                    </Box>
+                                                </TableCell>
+                                                <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                                    {position.quantity}
+                                                </TableCell>
+                                                <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                                    {formatCurrency(position.avg_price)}
+                                                </TableCell>
+                                                <TableCell align="right" sx={{ color: '#4CAF50', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                                                    {formatCurrency(position.quantity * position.avg_price)}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                        {(!portfolio?.positions || Object.keys(portfolio.positions).length === 0) && (
+                                            <TableRow>
+                                                <TableCell colSpan={4} sx={{ textAlign: 'center', color: 'rgba(255, 255, 255, 0.5)', py: 3 }}>
+                                                    No open positions
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                            
+                            {portfolio?.cash && (
+                                <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                                            Available Cash:
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#4CAF50', fontWeight: 600 }}>
+                                            {formatCurrency(portfolio.cash)}
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Cumulative P&L Chart */}
+                    <Card sx={{ 
+                        mb: 3,
+                        backgroundColor: 'rgba(15, 20, 25, 0.95)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                        <CardContent>
+                            <Typography variant="h6" gutterBottom sx={{ color: '#fff' }}>
+                                Cumulative Realized P&L
+                            </Typography>
+                            <Box sx={{ height: 300, backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: 1, p: 2 }}>
+                                {cumulativePnLData.length > 0 ? (
+                                    <Line 
+                                        data={{
+                                            labels: cumulativePnLData.map(item => {
+                                                const date = new Date(item.date);
+                                                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                            }),
+                                            datasets: [{
+                                                label: 'Cumulative P&L',
+                                                data: cumulativePnLData.map(item => item.cumulativePnL),
+                                                borderColor: (ctx) => {
+                                                    const chart = ctx.chart;
+                                                    const {ctx: canvasCtx, chartArea} = chart;
+                                                    if (!chartArea) return '#36D1DC';
+                                                    
+                                                    const gradient = canvasCtx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                                                    gradient.addColorStop(0, '#f44336');
+                                                    gradient.addColorStop(0.5, '#ffeb3b');
+                                                    gradient.addColorStop(1, '#4CAF50');
+                                                    return gradient;
+                                                },
+                                                backgroundColor: 'rgba(54, 209, 220, 0.1)',
+                                                borderWidth: 3,
+                                                tension: 0.3,
+                                                fill: true,
+                                                pointBackgroundColor: '#36D1DC',
+                                                pointBorderColor: '#fff',
+                                                pointBorderWidth: 2,
+                                                pointRadius: 4,
+                                                pointHoverRadius: 6,
+                                            }]
+                                        }}
+                                        options={{
+                                            responsive: true,
+                                            maintainAspectRatio: false,
+                                            plugins: {
+                                                legend: {
+                                                    display: false
+                                                },
+                                                tooltip: {
+                                                    backgroundColor: 'rgba(15, 20, 25, 0.95)',
+                                                    titleColor: '#fff',
+                                                    bodyColor: '#fff',
+                                                    borderColor: '#36D1DC',
+                                                    borderWidth: 1,
+                                                    callbacks: {
+                                                        label: function(context) {
+                                                            const trade = cumulativePnLData[context.dataIndex].trade;
+                                                            return [
+                                                                `Cumulative P&L: ${formatCurrency(context.parsed.y)}`,
+                                                                `Trade: ${trade.side} ${trade.quantity} ${trade.symbol}`,
+                                                                `P&L: ${formatCurrency(trade.realized_pnl || 0)}`
+                                                            ];
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            scales: {
+                                                x: {
+                                                    grid: {
+                                                        color: 'rgba(255, 255, 255, 0.1)'
+                                                    },
+                                                    ticks: {
+                                                        color: 'rgba(255, 255, 255, 0.7)',
+                                                        font: {
+                                                            size: 11
+                                                        }
+                                                    }
+                                                },
+                                                y: {
+                                                    grid: {
+                                                        color: 'rgba(255, 255, 255, 0.1)'
+                                                    },
+                                                    ticks: {
+                                                        color: 'rgba(255, 255, 255, 0.7)',
+                                                        font: {
+                                                            size: 11
+                                                        },
+                                                        callback: function(value) {
+                                                            return formatCurrency(value);
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            interaction: {
+                                                intersect: false,
+                                                mode: 'index'
+                                            }
+                                        }}
+                                    />
+                                ) : (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                                        <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+                                            No trading data available for chart
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+                            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                                    Based on realized P&L from completed trades
+                                </Typography>
+                                <Typography variant="body2" sx={{ 
+                                    color: actualStats.totalPnL >= 0 ? '#4CAF50' : '#f44336',
+                                    fontWeight: 600 
+                                }}>
+                                    Total: {formatCurrency(actualStats.totalPnL)}
+                                </Typography>
+                            </Box>
+                        </CardContent>
+                    </Card>
+
+                    {/* Net Daily P&L Chart */}
+                    <Card sx={{
+                        backgroundColor: 'rgba(15, 20, 25, 0.95)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                        <CardContent>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                <Typography variant="h6" sx={{ color: '#fff' }}>
+                                    Net Daily P&L
+                                </Typography>
+                                <Button 
+                                    variant="outlined" 
+                                    size="small"
+                                    sx={{ 
+                                        borderColor: '#36D1DC',
+                                        color: '#36D1DC',
+                                        fontSize: '0.7rem',
+                                        '&:hover': { borderColor: '#5B86E5', backgroundColor: 'rgba(54, 209, 220, 0.1)' }
+                                    }}
+                                >
+                                    Click to open trade details for this date
+                                </Button>
+                            </Box>
+                            <Box sx={{ height: 150, backgroundColor: 'rgba(255, 255, 255, 0.02)', borderRadius: 1, p: 2, display: 'flex', alignItems: 'end', gap: 1, justifyContent: 'center' }}>
+                                {/* Static bars for Net Daily P&L */}
+                                {[35, 65, 25, 80, 45, 90, 30, 55, 70, 40, 85, 50, 75, 20, 95, 35, 60, 45, 80, 55].map((height, i) => {
+                                    const isPositive = height > 50;
+                                    return (
+                                        <Box
+                                            key={i}
+                                            sx={{
+                                                width: 8,
+                                                height: height,
+                                                backgroundColor: isPositive ? '#4CAF50' : '#f44336',
+                                                borderRadius: 0.5,
+                                                opacity: 0.8
+                                            }}
+                                        />
                                     );
                                 })}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                            </Box>
+                        </CardContent>
+                    </Card>
+                </Grid>
+            </Grid>
 
-                    {allTrades.length > 50 && (
-                        <Box sx={{ textAlign: 'center', mt: 2 }}>
-                            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                                Showing first 50 trades of {allTrades.length} total
-                            </Typography>
-                        </Box>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* Import Dialog */}
-            <Dialog
-                open={importDialogOpen}
-                onClose={() => setImportDialogOpen(false)}
+            {/* Add Note Dialog */}
+            <Dialog 
+                open={showAddNote} 
+                onClose={() => setShowAddNote(false)}
                 maxWidth="sm"
                 fullWidth
                 PaperProps={{
                     sx: {
-                        bgcolor: 'rgba(26, 32, 44, 0.95)',
+                        backgroundColor: '#1e1e1e',
                         color: 'white',
                         border: '1px solid rgba(255, 255, 255, 0.1)'
                     }
                 }}
             >
-                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    Import Trade History
-                    <IconButton onClick={() => setImportDialogOpen(false)} sx={{ color: 'white' }}>
-                        <Close />
-                    </IconButton>
+                <DialogTitle sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                    Add Trading Note
                 </DialogTitle>
-
-                <DialogContent>
-                    <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 3 }}>
-                        Upload a CSV file in the same format as exported from this platform. The file should contain columns like:
-                        trade_id, symbol, side, quantity, price, trade_date, realized_pnl, etc.
-                    </Typography>
-
-                    <Box
+                <DialogContent sx={{ pt: 2 }}>
+                    <TextField
+                        autoFocus
+                        multiline
+                        rows={4}
+                        fullWidth
+                        placeholder="Enter your trading note..."
+                        value={newNoteText}
+                        onChange={(e) => setNewNoteText(e.target.value)}
+                        variant="outlined"
                         sx={{
-                            border: '2px dashed rgba(255, 255, 255, 0.3)',
-                            borderRadius: 2,
-                            p: 4,
-                            textAlign: 'center',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            '&:hover': {
-                                borderColor: 'rgba(255, 255, 255, 0.5)',
-                                bgcolor: 'rgba(255, 255, 255, 0.05)'
-                            }
+                            '& .MuiOutlinedInput-root': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                color: 'white',
+                                '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
+                                '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
+                                '&.Mui-focused fieldset': { borderColor: '#36D1DC' }
+                            },
+                            '& .MuiInputBase-input::placeholder': { color: 'rgba(255, 255, 255, 0.5)' }
                         }}
-                        onClick={() => document.getElementById('csv-file-input').click()}
-                    >
-                        <Upload sx={{ fontSize: 48, color: 'rgba(255, 255, 255, 0.5)', mb: 2 }} />
-                        <Typography variant="h6" sx={{ color: 'white', mb: 1 }}>
-                            {importFile ? importFile.name : 'Click to select CSV file'}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                            Supported format: CSV (exported from this platform)
-                        </Typography>
-                    </Box>
-
-                    <input
-                        id="csv-file-input"
-                        type="file"
-                        accept=".csv"
-                        style={{ display: 'none' }}
-                        onChange={(e) => setImportFile(e.target.files[0])}
                     />
                 </DialogContent>
-
-                <DialogActions sx={{ p: 3 }}>
-                    <Button
-                        onClick={() => setImportDialogOpen(false)}
+                <DialogActions sx={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', p: 2 }}>
+                    <Button 
+                        onClick={() => setShowAddNote(false)}
                         sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
                     >
                         Cancel
                     </Button>
-                    <Button
+                    <Button 
+                        onClick={handleAddNote}
                         variant="contained"
-                        onClick={handleImport}
-                        disabled={!importFile || importing}
-                        sx={{ bgcolor: '#5B86E5', '&:hover': { bgcolor: '#4A73C2' } }}
+                        disabled={!newNoteText.trim()}
+                        sx={{
+                            background: 'linear-gradient(45deg, #36D1DC 30%, #5B86E5 90%)',
+                            '&:disabled': { backgroundColor: 'rgba(255, 255, 255, 0.1)' }
+                        }}
                     >
-                        {importing ? 'Importing...' : 'Import'}
+                        Add Note
                     </Button>
                 </DialogActions>
             </Dialog>
 
-            {/* Snackbar */}
-            <Snackbar
-                open={snackbar.open}
-                autoHideDuration={6000}
-                onClose={() => setSnackbar({ ...snackbar, open: false })}
+            {/* Edit Note Dialog */}
+            <Dialog 
+                open={editingNoteIndex >= 0} 
+                onClose={handleCancelEdit}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        backgroundColor: '#1e1e1e',
+                        color: 'white',
+                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                    }
+                }}
             >
-                <Alert
-                    onClose={() => setSnackbar({ ...snackbar, open: false })}
-                    severity={snackbar.severity}
-                    sx={{ width: '100%' }}
-                >
-                    {snackbar.message}
-                </Alert>
-            </Snackbar>
+                <DialogTitle sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                    Edit Trading Note
+                </DialogTitle>
+                <DialogContent sx={{ pt: 2 }}>
+                    <TextField
+                        autoFocus
+                        multiline
+                        rows={4}
+                        fullWidth
+                        placeholder="Edit your trading note..."
+                        value={editNoteText}
+                        onChange={(e) => setEditNoteText(e.target.value)}
+                        variant="outlined"
+                        sx={{
+                            '& .MuiOutlinedInput-root': {
+                                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                color: 'white',
+                                '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
+                                '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
+                                '&.Mui-focused fieldset': { borderColor: '#36D1DC' }
+                            },
+                            '& .MuiInputBase-input::placeholder': { color: 'rgba(255, 255, 255, 0.5)' }
+                        }}
+                    />
+                </DialogContent>
+                <DialogActions sx={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', p: 2 }}>
+                    <Button 
+                        onClick={handleCancelEdit}
+                        sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button 
+                        onClick={handleSaveEditNote}
+                        variant="contained"
+                        disabled={!editNoteText.trim()}
+                        sx={{
+                            background: 'linear-gradient(45deg, #36D1DC 30%, #5B86E5 90%)',
+                            '&:disabled': { backgroundColor: 'rgba(255, 255, 255, 0.1)' }
+                        }}
+                    >
+                        Save Changes
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Container>
     );
 };

@@ -19,7 +19,7 @@ import {
   MenuBook,
   ExpandMore,
   Assessment,
-  Today,
+  Analytics,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -63,7 +63,7 @@ const Navbar = () => {
 
   const journalItems = [
     { label: 'Dashboard', path: '/journal', icon: <Assessment /> },
-    { label: 'Daily Journaling', path: '/daily-journaling', icon: <Today /> },
+    { label: 'Analytics', path: '/journal-analytics', icon: <Analytics /> },
   ];
 
   return (
