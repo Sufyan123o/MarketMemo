@@ -12,6 +12,7 @@ import Playground from './pages/Playground';
 import Journal from './pages/Journal';
 import DailyJournal from './pages/DailyJournal';
 import Analytics from './pages/Analytics';
+import AITradingCoach from './pages/AITradingCoach';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 function AppContent() {
@@ -58,6 +59,10 @@ function AppContent() {
         <Route 
           path="/journal-analytics" 
           element={user ? <Analytics /> : <Navigate to="/login" />} 
+        />
+        <Route 
+          path="/ai-trading-coach" 
+          element={user ? <AITradingCoach /> : <Navigate to="/login" />} 
         />
       </Routes>
     </Box>

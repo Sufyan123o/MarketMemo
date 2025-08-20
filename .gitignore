@@ -8,10 +8,10 @@ Icon?
 *.sublime-*            # Sublime
 *.code-workspace
 *.md
+*.txt
 # ─────────────────── 2. Environment variables & secrets ─────────────────────
 .env
 .env.*                 # .env.local, .env.production, etc.
-
 # ─────────────────── 3. Node / React (front‑end) ────────────────────────────
 node_modules/
 # Build & cache

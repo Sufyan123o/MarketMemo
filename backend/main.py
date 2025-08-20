@@ -14,6 +14,7 @@ from api.auth import router as auth_router
 from api.portfolio import router as portfolio_router
 from api.watchlist import router as watchlist_router
 from api.playground import router as playground_router
+from api.ai_coach import router as ai_coach_router
 
 # Create FastAPI app
 app = FastAPI(
@@ -37,6 +38,7 @@ app.include_router(auth_router, prefix="/api/auth", tags=["authentication"])
 app.include_router(portfolio_router, prefix="/api/portfolio", tags=["portfolio"])
 app.include_router(watchlist_router, prefix="/api/watchlist", tags=["watchlist"])
 app.include_router(playground_router, prefix="/api/playground", tags=["playground"])
+app.include_router(ai_coach_router, prefix="/api/ai-coach", tags=["ai-coach"])
 
 @app.get("/")
 async def root():

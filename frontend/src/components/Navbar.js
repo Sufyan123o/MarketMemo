@@ -20,6 +20,7 @@ import {
   ExpandMore,
   Assessment,
   Analytics,
+  Psychology,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -64,6 +65,7 @@ const Navbar = () => {
   const journalItems = [
     { label: 'Dashboard', path: '/journal', icon: <Assessment /> },
     { label: 'Analytics', path: '/journal-analytics', icon: <Analytics /> },
+    { label: 'AI Trading Coach', path: '/ai-trading-coach', icon: <Psychology /> },
   ];
 
   return (
